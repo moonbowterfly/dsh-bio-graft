@@ -129,6 +129,20 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
         candidates += mapped
 
     candidates.sort(key=lambda c: (c['start_0'], c['strand']))
+    # 模板内重复计数（多位点匹配检测）——一个 guide 匹配多处 = 多位点切割，
+    # 敲除/敲入实验不可用。实测（2026-09-12 E2E）：高重复序列里 27 条候选
+    # 只有 10 条唯一 protospacer、仅 5 条合格——agent 曾手工做这个统计，
+    # 现在是工具内置事实（每个候选带 template_hits + multi_match warning）。
+    from collections import Counter
+    spacer_counter = Counter(c['protospacer'] for c in candidates)
+    for c in candidates:
+        hits = spacer_counter.get(c['protospacer'], 1)
+        c['template_hits'] = hits
+        if hits > 1:
+            c.setdefault('warnings', []).append(
+                f'multi_match: protospacer 在模板中出现 {hits} 次（多位点切割风险，'
+                f'敲除类实验通常需剔除）')
+    n_unique = len(spacer_counter)
     candidates = candidates[:top_n]
     return {
         'editor': editor,
@@ -136,6 +150,9 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
         'spacer_length': L,
         'position_base': str(position_base),
         'n_candidates_raw': len(candidates),
+        'n_unique_protospacers': n_unique,
+        'multi_match_note': (f'{len(candidates)} 条候选对应 {n_unique} 条唯一 protospacer；'
+                             f'template_hits>1 的候选有多位点切割风险' if n_unique < len(candidates) else None),
         'candidates': candidates,
         'note': 'start_0/end_0 = 0-based 半开区间 [start, end)；strand 为 guide 对应的靶点在原链的方向',
     }

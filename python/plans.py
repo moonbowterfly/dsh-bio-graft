@@ -111,7 +111,7 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
     elif action == 'update_recommendation':
         if not os.path.exists(plan_path):
             raise FileNotFoundError(plan_path)
-        plan = json.load(open(plan_path, 'e' if False else 'utf-8'))
+        plan = json.load(open(plan_path, encoding='utf-8'))
         if candidates is not None:
             plan['candidates'] = candidates
             if candidates and isinstance(candidates[0], dict):
@@ -136,7 +136,15 @@ def plan_load(plan_path: str) -> dict:
     if not os.path.exists(plan_path):
         raise FileNotFoundError(plan_path)
     plan = json.load(open(plan_path, encoding='utf-8'))
-    runs_dir = os.path.join(os.path.dirname(plan_path), 'runs')
+    # ⚠️ runs 目录在 plans/<name>/runs/ —— 与 plan_create 的写入路径必须一致
+    # （实测 bug：曾读成兄弟目录 plans/runs/，导致 n_runs 恒为 0、审计时间线失效）
+    name = plan.get('plan_name') or os.path.basename(plan_path).replace('.editplan.json', '')
+    runs_dir = os.path.join(os.path.dirname(plan_path), name, 'runs')
+    if not os.path.isdir(runs_dir):
+        # 兼容旧布局（plans/runs/ 直挂）——仅当同名目录不存在时回退
+        legacy = os.path.join(os.path.dirname(plan_path), 'runs')
+        if os.path.isdir(legacy):
+            runs_dir = legacy
     runs = []
     if os.path.isdir(runs_dir):
         for f in sorted(os.listdir(runs_dir)):

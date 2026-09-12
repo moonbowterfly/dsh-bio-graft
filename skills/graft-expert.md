@@ -44,6 +44,10 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 
 ## 硬规则（搭在 architecture 级 gate，不靠 agent 自觉）
 
+0. **多位点检测是工具内置事实**：`graft_design` 的每个候选带 `template_hits`
+   （protospacer 在模板内出现次数）与 `multi_match` 警告；**敲除类实验必须剔除
+   `template_hits > 1` 的候选**（一个 guide 匹配多处 = 多位点切割，实验不可用）。
+   报告里注明「X 条候选 → Y 条唯一 → Z 条合格」的口径。
 1. **Off-target 永不说 safe**——「No computational off-target method may
    label a design as safe」。只能说「在当前搜索参数下未检出高分位点」
    / 「预测风险较低或较高」/「在 XX 组学文库功能注释里有 XX 提示」。
