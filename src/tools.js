@@ -10,9 +10,7 @@
 //   graft_plan_save       — EditPlan 保存/追加 run（append-only 账本）
 //   graft_plan_load       — EditPlan 读回（plan + 全部 runs 时间线）
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { isAbsolute } from 'node:path'
-import { callGraft, stampProvenance } from './python.js'
-import { ensureCasoffinder } from '../python/offtarget.js'
+import { callGraft } from './python.js'
 
 /** graft_ops 通用工具工厂（ graft op 全部直接透传 JSON）。 */
 function graftTool(opts) {
@@ -116,8 +114,7 @@ export function registerTools(ctx) {
     },
     async execute(args) {
       if (args.action === 'ensure') {
-        const r = await ensureCasoffinder()
-        return stampProvenance('graft_backend_status', r)
+        return callGraft('offtarget_ensure', {}, { timeoutMs: 300_000 })
       }
       return callGraft('offtarget_backend', args, { timeoutMs: 60_000 })
     },

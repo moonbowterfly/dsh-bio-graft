@@ -23,6 +23,10 @@ import json
 import os
 import sys
 
+# ⚠️ -I（isolated）模式下脚本目录不进 sys.path（dsh 用 -I 调用）——
+# 必须显式插入，否则 editors/guides/plans 等同目录模块全部 ModuleNotFoundError。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 if sys.platform == 'win32':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -31,7 +35,7 @@ if sys.platform == 'win32':
 
 from editors import EDITORS, get_editor
 from guides import enumerate_guides, score_guides
-from offtarget import casoffinder_scan, locate_casoffinder
+from offtarget import casoffinder_scan, locate_casoffinder, ensure_casoffinder
 from plans import plan_create, plan_load
 
 
@@ -59,6 +63,7 @@ OPS = {
     'guide_score': lambda args: score_guides(**args),
     'offtarget_scan': lambda args: casoffinder_scan(**args),
     'offtarget_backend': lambda args: {'backend': locate_casoffinder()},
+    'offtarget_ensure': lambda args: ensure_casoffinder(),
     'plan_create': lambda args: plan_create(**args),
     'plan_load': lambda args: plan_load(**args),
 }

@@ -22,17 +22,21 @@
   },
   "files": [
     "index.js",
-    "src",
-    "skills",
-    "python",
-    "docs",
-    "test",
+    "src/**/*.js",
     "cordis.patch.yml",
+    "python/**/*.py",
+    "skills/**/*.md",
+    "docs/**/*.md",
     "README.md",
     "README.en.md",
     "THIRD_PARTY_NOTICES.md",
     "LICENSE"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
     "test": "node test/smoke.js --skip-build"
   },

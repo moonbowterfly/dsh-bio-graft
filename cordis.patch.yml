@@ -5,8 +5,3 @@
 - insert:
     - id: dsh-bio-graft
       name: '@dsh-bio/dsh-bio-graft'
-      version: ^0.1.0
-      dev: false
-
-- log: { level: info }
-- dsh-bio-graft
