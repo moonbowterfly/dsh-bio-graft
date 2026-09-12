@@ -1,0 +1,53 @@
+{
+  "name": "@dsh-bio/dsh-bio-graft",
+  "version": "0.1.0",
+  "description": "基因编辑设计插件：sgRNA 候选枚举 + 评分向量（不打综合分）+ Cas-OFFinder 脱靶扫描（BSD-3）+ EditPlan 可审计账本 + 风险分级门控 | CRISPR / gene-editing design specialty plugin for dsh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moonbowterfly/dsh-bio-graft.git"
+  },
+  "homepage": "https://github.com/moonbowterfly/dsh-bio-graft",
+  "bugs": {
+    "url": "https://github.com/moonbowterfly/dsh-bio-graft/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "src",
+    "skills",
+    "python",
+    "docs",
+    "test",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/smoke.js --skip-build"
+  },
+  "keywords": [
+    "dsh",
+    "crispr",
+    "gene-editing",
+    "sgrna",
+    "base-editing",
+    "off-target",
+    "bioinformatics"
+  ],
+  "author": "moonbowterfly",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}
