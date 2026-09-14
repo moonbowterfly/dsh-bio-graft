@@ -3,7 +3,7 @@
 // 覆盖：FASTA/多行输入(D1) · Cas12a IUPAC PAM(D2) · cut_site 坐标口径(D5) · EditPlan 账本(D6)
 // 夹具设计：序列里只有一个 PAM 命中，且反链无命中 —— 期望值可手算。
 import { check, summary, op } from './harness.mjs'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -76,6 +76,30 @@ try {
   unknownEditorThrew = /unknown editor/i.test(e.message)
 }
 check('unknown editor fails loudly', unknownEditorThrew)
+
+// ---------- 5b. 非 ASCII 参数必须原样往返（stdin/stdout 编解码契约）----------
+// 回归背景（2026-09-14 真实会话实测）：graft_ops.py 只把 stdout 切成 UTF-8，漏了 stdin
+// → Windows 下按 GBK 误解码 agent 传来的 UTF-8 中文，得孤立代理项，写盘抛
+// UnicodeEncodeError: surrogates not allowed（实见 \udcab）→ 计划创建失败、agent 自愈。
+const CN = '中文诊断：含中文标点（括号）、分号；emoji 🧬 与全角空格　测试'
+const cnDir = join(tmpdir(), `graft-golden-cn-${process.pid}`)
+rmSync(cnDir, { recursive: true, force: true })
+mkdirSync(cnDir, { recursive: true })
+const cnPlan = op('plan_create', {
+  plan_dir: cnDir, plan_name: 'cn_roundtrip', action: 'new',
+  intent: { target: 'diag', notes: CN },
+  risk_flags: ['非致病合成构建体 / 基础研究用途，正常提供设计'],
+})
+const cnBack = op('plan_load', { plan_path: cnPlan.plan_path })
+check('non-ASCII payload round-trips byte-identically (stdin UTF-8 contract)',
+  cnBack.plan?.intent?.notes === CN,
+  `got ${JSON.stringify(cnBack.plan?.intent?.notes)}`)
+check('non-ASCII risk_flags round-trip',
+  cnBack.plan?.risk_flags?.[0] === '非致病合成构建体 / 基础研究用途，正常提供设计')
+check('no truncated *.tmp file left behind by the atomic write',
+  !readdirSync(cnDir).some((f) => f.includes('.tmp')),
+  JSON.stringify(readdirSync(cnDir)))
+rmSync(cnDir, { recursive: true, force: true })
 
 // ---------- 6. EditPlan 账本（D6）----------
 const planDir = join(tmpdir(), `graft-golden-plans-${process.pid}`)

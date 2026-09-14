@@ -62,4 +62,19 @@ for (const opName of [...referenced].sort()) {
   check(`op "${opName}" exists in graft_ops OPS`, opsBlock.includes(`'${opName}'`))
 }
 
+// ---------- 分支型工具必须真的走到自己的 execute ----------
+// 回归背景（2026-09-14 真实会话）：工具工厂无条件覆盖 execute，导致 graft_backend_status
+// 的 status/devices/ensure 三个分支永远失效，落到 callGraft(undefined) → "unknown op: None"。
+const backendTool = registered.find((t) => t.name === 'graft_backend_status')
+check('graft_backend_status is registered', Boolean(backendTool))
+if (backendTool) {
+  const st = await backendTool.execute({ action: 'status' })
+  check('graft_backend_status(action=status) reaches the offtarget_backend op',
+    Boolean(st && typeof st.backend === 'object' && 'ok' in st.backend),
+    JSON.stringify(st).slice(0, 200))
+  const dev = await backendTool.execute({ action: 'devices' })
+  check('graft_backend_status(action=devices) returns the OpenCL device list',
+    Array.isArray(dev?.devices), JSON.stringify(dev).slice(0, 200))
+}
+
 summary('tools-contract')

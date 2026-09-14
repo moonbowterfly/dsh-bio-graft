@@ -27,15 +27,18 @@ import sys
 # 必须显式插入，否则 editors/guides/plans 等同目录模块全部 ModuleNotFoundError。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-if sys.platform == 'win32':
-    # stdout 必须 UTF-8（JSON 契约）；stderr 同样要 UTF-8 —— 否则中文异常信息
-    # 按控制台 GBK 编码写出，进 traceback → TS 桥把乱码当成「需要修复」的线索给 agent。
+# ── 编解码契约（家族同款；graft 曾漏掉 stdin，2026-09-14 E2E 实测暴露）─────────────
+# Windows 上子进程的 stdin/stdout/stderr 默认按 locale（本机 GBK）编解码，而 TS 侧
+# 永远写 UTF-8 字节。只重设 stdout 时，agent 传来的**任何非 ASCII 参数**（中文 notes、
+# 中文说明）会被按 GBK 误解码成乱码/代理项，随后写盘抛
+# "UnicodeEncodeError: ... surrogates not allowed"（实测 \udcab）→ 计划创建失败、
+# agent 被迫自愈。三个流必须全部 UTF-8（genie 的 bio_ops.py/bridge.py 与 gem 的
+# gem_ops.py 都是这么做的，本插件补齐）。
+for _stream, _kwargs in ((sys.stdin, {'encoding': 'utf-8'}),
+                         (sys.stdout, {'encoding': 'utf-8'}),
+                         (sys.stderr, {'encoding': 'utf-8', 'errors': 'replace'})):
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
-    try:
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        _stream.reconfigure(**_kwargs)
     except Exception:
         pass
 

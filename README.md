@@ -8,9 +8,22 @@
 
 | 插件 | 隐喻 | 职责 |
 |---|---|---|
-| **genie** | 许愿| 通用生信宿主：49+ 语义化工具 + 自举 Python 环境 + 出版级绘图 |
+| **genie** | 许愿 | 通用生信宿主：50+ 语义化工具 + 自举 Python 环境 + 出版级绘图 |
 | **gem** | 晶石（模型资产） | 基因组尺度代谢模型：构建/验证/补洞/账本 |
 | **graft** | 嫁接（序列变更） | 基因编辑设计：sgRNA 候选 / 评分向量 / 脱靶扫描 / EditPlan 账本 |
+
+## 接入状态（2026-09-14）
+
+| 能力 | 状态 |
+|---|---|
+| `graft_*` 工具注册（与 genie 工具同实例共存） | ✅ 已实现 |
+| `graft-expert` skill（经 `ctx.skills.register` 汇入 agent 的 skill 目录） | ✅ 已实现 |
+| hosted-domain integration 协议（`/api/dsh-bio-graft/integration/health`、`/v1/status`） | ⚠️ **载荷仍为早期形状**，尚未对齐 `genie/docs/plugin-integration.md` v2 契约（字段名/`checks` 数组/`generatedAt` 等）——批次 B |
+| genie 设置面板「基因编辑设计」条件分页 | ❌ **未实现**（早前 README 的说法不成立；genie 侧目前没有任何 graft 引用）——批次 B |
+| genie persona 能力域路由（存在性感知） | ❌ 未实现——批次 B |
+
+> 在批次 B 落地前：graft 只能通过**工具注册表**被 agent 直接调用，安装状态不体现在 BioGenie 面板里。
+> 计划与任务分解见 `docs/PLAN-2026-09-14.md`（施工依据）与 `docs/ARCHITECTURE.md`（架构）。
 
 ## 核心哲学
 
@@ -20,26 +33,37 @@ modality（nuclease / base editing / prime editing / HDR / paired deletion），
 
 **Score vector，不是综合分** —— 每个 sgRNA 候选保留完整评分向量
 （GC / 同聚物 / 自回文 / U6 起始偏好 / seed 序列），**不打「87.3 分」这种
-伪精确综合分**；最终推荐由 agent 按 objective 结合证据解释。
+伪精确综合分**；排名由 `graft_rank` / 上层的**声明式 objective** 完成并落账本。
+
+**坐标与几何必须自带口径** —— 候选带 `start_0/end_0`（0-based 半开、含 PAM）与
+**`cut_site_0`**，并附 `cut_site_convention`（口径字符串）与 `cut_site_verified`
+（该编辑器几何是否已对一手文献核对）。没有口径的数字不许进报告。
+
+**证据分级** —— `graft_profiles` 的每个编辑器带 `verified` + `pam_source`：
+`verified=false`（如 Cas12b/Cas13a 当前状态）表示 PAM/几何**尚未核对一手文献**，
+下游必须如实转述。
 
 **EditPlan 是可审计科学对象** —— 每次设计迭代不是「重新聊天」，而是
-修改/追加一个 `.editplan.json`（append-only `runs/` 账本）。可回答
-「为什么昨天推荐 B、今天推荐 D？」（因为 reference / backend / ranking policy 变了）。
+修改/追加一个 `.editplan.json`（append-only `runs/` 账本，run 号单调只增、写入原子、
+同名计划默认拒绝覆盖）。可回答「为什么昨天推荐 B、今天推荐 D？」——因为
+reference / backend / ranking policy 变了。
 
 **脱靶铁律** —— No computational off-target method may label a design as safe.
-只可说「在当前搜索参数下未检出高分位点」。
+工具返回值恒带 `interpretation_boundary`（机器可读边界声明）；0 命中时额外返回
+`zero_hit_warning`（列出常见假阴性原因：基因组版本不符 / query 方向 / mismatch 过严 /
+N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高分位点」。
 
-## v0.1 能力（7 个语义化工具）
+## 工具（7 个语义化工具）
 
 | 工具 | 说明 |
 |---|---|
-| `graft_profiles` | 内置 NucleaseProfile 注册表（SpCas9 / SpCas9-NG / SpG / Cas12a / Cas12b / Cas13a） |
-| `graft_design` | PAM 双向扫描枚举 sgRNA 候选 + 评分向量（含坐标体系与 strand） |
-| `graft_score` | 对已有候选列表单独打评分向量 |
-| `graft_offtarget` | Cas-OFFinder（BSD-3 官方 Windows 二进制）批量脱靶扫描 |
-| `graft_backend_status` | 后端探测 / `action=ensure` 自动安装 Cas-OFFinder |
+| `graft_profiles` | 内置 NucleaseProfile 注册表（PAM/spacer/几何 + `verified`/`pam_source` 证据分级） |
+| `graft_design` | PAM 双向扫描枚举 sgRNA + 评分向量 + **切割位点**（IUPAC 感知；FASTA/裸序列/多条 FASTA） |
+| `graft_score` | 对已有候选补打评分向量（不打综合分） |
+| `graft_offtarget` | Cas-OFFinder 批量脱靶扫描 → **结构化命中**（染色体/0-based 与 1-based 坐标/错配位置/链）；支持 `preflight_only` 基因组体检、`device=auto` |
+| `graft_backend_status` | 后端探测（`status`）/ OpenCL 设备列表（`devices`）/ 自动安装（`ensure`，仅 Windows） |
 | `graft_plan_save` | EditPlan 写入（new / add_run / update_recommendation） |
-| `graft_plan_load` | EditPlan 读回（主 plan + 全部 runs 时间线） |
+| `graft_plan_load` | EditPlan 读回（plan + 全部 runs 时间线） |
 
 ## 安装（作为 dsh 插件）
 
@@ -47,25 +71,33 @@ modality（nuclease / base editing / prime editing / HDR / paired deletion），
 dsh plugin add @dsh-bio/dsh-bio-graft --profile web
 ```
 
-宿主 `dsh-bio-genie` 会通过 **hosted-domain integration 协议 v1**
-（`/api/dsh-bio-graft/integration/health` 与 `/v1/status`）感知 graft 的安装与运行状态，
-并在 BioGenie 设置面板提供条件子页。
-
 ## 运行依赖
 
 | 依赖 | 说明 |
 |---|---|
-| Python ≥3.10 | 复用 `dsh-bio-genie` 自举环境（`GRAFT_PYTHON` 可显式指定解释器） |
-| Cas-OFFinder（可选） | 官方 Windows x86-64 二进制，BSD-3。`graft_backend_status action=ensure` 自动下载到 `~/.dsh/dsh-bio-graft/bin/` |
+| Python ≥3.10 | 复用 `dsh-bio-genie` 自举环境（`GRAFT_PYTHON` 可显式指定解释器）；graft 的 op 全部为标准库实现 |
+| Cas-OFFinder（可选） | 官方 Windows x86-64 二进制 v2.4.1（BSD-3）。`graft_backend_status action=ensure` 自动下载到 `~/.dsh/dsh-bio-graft/bin/` |
+| OpenCL 运行时 | Cas-OFFinder 需要 OpenCL 设备（GPU 驱动自带；纯 CPU 运行需 Intel/AMD OpenCL runtime）。`action=devices` 可查；`device=auto` 自动选择 |
+
+> ⚠️ 实测：本机（NVIDIA RTX 3050 + AMD gfx90c）**没有 CPU OpenCL 设备**，传 `C` 会直接报
+> `No OpenCL devices found.`——所以默认 `device=auto`，并回显实际使用的设备与选择理由。
 
 ## 数据目录
 
 ```
 ~/.dsh/dsh-bio-graft/
 ├── bin/cas-offinder.exe        # 自动安装的脱靶扫描后端
+├── tmp/                        # Cas-OFFinder 输入文件与命中原始输出
 └── plans/
-    ├── <name>.editplan.json     # 当前推荐 + 最新状态
-    └── <name>/runs/             # append-only 账本（001_xxx.json, 002_xxx.json, …）
+    ├── <name>.editplan.json     # 当前推荐 + 最新状态（含 last_run_number 单调计数器）
+    └── <name>/runs/             # append-only 账本（001_new.json, 002_add_run.json, …）
+```
+
+## 自检与回归
+
+```bash
+npm test                 # 工具契约 + 黄金 op + 真实脱靶扫描（52 断言）
+GRAFT_STRICT=1 npm test  # 严格模式：探针/跳过一律 FAIL（用于 CI，杜绝静默跳过）
 ```
 
 ## 安全边界（架构级门控，写在 skill 中）
@@ -79,23 +111,25 @@ dsh plugin add @dsh-bio/dsh-bio-graft --profile web
 ## 许可与第三方
 
 本插件 MIT。**不 bundle 任何许可不兼容的第三方代码**：
-- Cas-OFFinder（BSD-3）以**外部二进制**形式由用户机器托管（自动下载/手动放置），
-  详见 `THIRD_PARTY_NOTICES.md`
+
+- Cas-OFFinder（BSD-3）以**外部二进制**形式由用户机器托管（自动下载/手动放置），详见 `THIRD_PARTY_NOTICES.md`
 - FlashFry（GPL-3+）/ PrimeDesign（AGPL+商业双许可）/ inDelphi（非商业）/
   CRISPResso2（非商业学术 EULA）→ 一律 **external adapter**，检测到用户合法安装时接入
 
-## Roadmap
+## 能力批次
 
-| 版本 | 内容 |
-|---|---|
-| v0.1（当前） | NucleaseProfile + sgRNA 枚举/评分 + Cas-OFFinder + EditPlan |
-| v0.2 | BaseEditorProfile、可编辑窗口分析、bystander 枚举、paired-guide |
-| v0.3 | Prime editing、CRISPRi/a、Cas13、HDR 供体设计、验证方案规划 |
-| v0.4 | 编辑结果预测（provider 化）、CRISPResso2 适配、结果↔EditPlan 回灌闭环 |
+| 批次 | 内容 | 状态 |
+|---|---|---|
+| A | 可信底座：FASTA/IUPAC/Cas-OFFinder 真实契约/cut_site/账本加固 + 测试网 | ✅ 完成 |
+| B | 契约化接入：integration v2 载荷 + `capabilities.json` + genie 侧域注册表/条件分页/persona 路由 | 计划中 |
+| C | 脱靶语义层（per-guide 汇总/seed 分布）+ 声明式 `graft_rank` + EditPlan 0.2 收口 | 计划中 |
+| D | 碱基编辑（BaseEditorProfile + `graft_base_edit` + bystander/密码子后果） | 计划中 |
+
+> 版本号只递增 patch（0.1.1 → 0.1.2 …）；批次名不使用版本号，避免与 npm 版本混淆。
 
 ## 架构
 
-见 `docs/ARCHITECTURE.md`（编写中）。集成协议见 `src/integration.js`。
+见 `docs/ARCHITECTURE.md`。集成协议见 `src/integration.js`；编辑器几何的证据状态见 `docs/PROFILES-TODO.md`。
 
 ---
 
