@@ -14,6 +14,7 @@
     "graft_score",
     "graft_rank",
     "graft_offtarget",
+    "graft_base_edit",
     "graft_backend_status",
     "graft_plan_save",
     "graft_plan_load"

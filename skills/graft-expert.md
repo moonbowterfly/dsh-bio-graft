@@ -32,6 +32,22 @@ VERIFY    graft_plan_save(action=add_run) 记录 validation_plan（引物/测序
 AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B 今天 D」
 ```
 
+## modality 选择（desired edit first）
+
+先看「要什么生物学结果」→ 再看「序列层面的改变类型」→ 最后才看有没有合适的 PAM/窗口：
+
+| 用户想要的改变 | 首选 modality | 工具 |
+|---|---|---|
+| 打断基因 / 敲除（不要求精确序列） | nuclease（NHEJ indel） | `graft_design` |
+| 精确单碱基替换（C→T 或 A→G），且目标碱基落在编辑窗口内 | **碱基编辑** | `graft_base_edit` |
+| 插入 / 大片段替换 / 精确多重编辑 | prime editing 或 HDR —— **本插件未实现**，如实说明并给设计要点 | —（不许假装支持） |
+| 敲低而非敲除（不改变序列） | CRISPRi/a —— **未实现** | —（如实说明） |
+
+**碱基编辑的两条硬约束**（`graft_base_edit` 会自动检查并写进 warnings）：
+① 目标碱基必须在核心窗口内，且底物匹配（CBE=C，ABE=A）；
+② 窗口内其他同底物碱基会被**一起编辑（bystander）** → 产物不纯，报告必须写明，
+不得只写「成功实现 C→T」。
+
 ## 工具清单
 
 | 工具 | 说明 |
@@ -40,6 +56,7 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 | `graft_design` | sgRNA 枚举 + 评分向量（不打综合分） |
 | `graft_score` | 单独对候选列表打分（复用） |
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-显式权重）；返回 policy_id + policy_digest + 被剔除原因；负证据语义（数据缺失=not_searched，绝不静默通过） |
+| `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + bystander + 密码子后果；只做几何不预测活性；链语义三件套（反链 C→T = 参考正链 G→A） |
 | `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3，需用户准备 genome FASTA + 模式文件） |
 | `graft_backend_status` | 后端探测/ensure 安装 Cas-OFFinder |
 | `graft_plan_save` | EditPlan 写入（new/add_run/update_recommendation） |

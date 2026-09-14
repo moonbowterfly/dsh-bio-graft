@@ -21,6 +21,7 @@ toolsMod.registerTools(ctx)
 
 const EXPECTED = [
   'graft_backend_status',
+  'graft_base_edit',
   'graft_design',
   'graft_offtarget',
   'graft_plan_load',

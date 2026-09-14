@@ -18,6 +18,21 @@
 | **Cas12b** | PAM **`TTN`**，5′，spacer 20，staggered，cut +17 | ❌ **未核** | ① 本机原始声明是 `TNN`，与 `TTN` 不一致——哪个对？核对 AapCas12b 一手文献（Shmakov 2015 / Teng 2018 / Strecker 2019）；② spacer 长度与切点偏移；③ 是否存在 editing-window 差异 |
 | **Cas13a** | 占位 `NNN`，3′，spacer 22，enzymatic-RNA | ❌ **未核** | Cas13a 靶 RNA、无 DNA PAM 概念（用 PFS/侧翼偏好）；当前为占位声明，designer 未实现（调 `graft_design` 会被明确拒绝） |
 
+## 碱基编辑器窗口（BaseEditorProfile 证据状态）
+
+> 规则：窗口数字**必须**来自一手文献并带计数约定；核不到就不入注册表（宁可少支持，不可编数字）。
+> 约定：位置 1 = protospacer 的 **PAM-distal** 端；PAM 记为位置 21–23。
+
+| 编辑器 | 家族 | 化学 | 核心窗口 | 状态 | 来源 |
+|---|---|---|---|---|---|
+| BE3 | CBE | C→T | **4–8** | ✅ verified | Komor 2016 Nature 533:420；计数约定原文（PMC6535181）："positions 4–8, counting the PAM as positions 21–23" |
+| BE4max | CBE | C→T | 4–8 | ✅ verified | Koblan 2018 Nat Biotechnol 36:843；窗口为 BE4 家族实测口径（PMC7384975："≥50% of maximum at positions 4–8"） |
+| ABE7.10 | ABE | A→G | **4–7** | ✅ verified | Gaudelli 2017 Nature 551:464 原文："from protospacer positions ~4–7 for ABE7.10 … counting the PAM as positions 21–23" |
+
+**待核（未入注册表，调用会得到明确的 unknown base editor 报错）**：Target-AID（Nishida 2016 Science）、
+ABE8e / ABE8.20（Richter 2020 Nat Biotechnol）、BE3 的窄窗变体（YE1/EE/YE2）、Cas12a-CBE。
+入册前需逐条核：窗口 + 计数约定 + 底物/产物 + PAM 与 nick 几何。
+
 ## 待评估（不是缺陷，是版本边界与外部事实）
 
 - **Cas-OFFinder 版本边界（2026-09-14 本机核验）**：GitHub releases 上 `2.4.1`（2021-01-23）是**最后一个稳定版**，

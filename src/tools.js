@@ -42,12 +42,15 @@ export function registerTools(ctx) {
   disposers.push(ctx.tools.register(graftTool({
     name: 'graft_profiles',
     description:
-      '列出内置编辑酶/NucleaseProfile（graft 的语义基石，所有下游都从 profile 读）。' +
-      '每个 profile 返回：PAM 模式（IUPAC，如 NGG/TTTV）、PAM 位置（3prime/5prime）、' +
+      '列出内置编辑酶/NucleaseProfile（graft 的语义基石，所有下游都从 profile 读）与**碱基编辑器**' +
+      '（BaseEditorProfile，五层结构）。' +
+      'Nuclease 每个 profile 返回：PAM 模式（IUPAC，如 NGG/TTTV）、PAM 位置（3prime/5prime）、' +
       'spacer 长度、切点偏移与结构（blunt/staggered）、评分文献引用，以及 **verified / pam_source ' +
       '证据分级**——verified=false 表示该 PAM/几何尚未对一手文献核对，报告里必须如实转述，' +
-      '不得当作既定事实。选编辑器/查 PAM 之前先跑本工具。' +
-      '触发词：编辑酶、Cas9、Cas12、有哪些编辑器、PAM 规则、spacer 长度、切割位点。',
+      '不得当作既定事实。碱基编辑器返回 targeting/chemistry/activity/evidence/applicability 五层' +
+      '（窗口编号约定：位置 1 = PAM-distal 端，PAM 记为 21–23）+ window_evidence 引用。' +
+      '选编辑器/查 PAM 或编辑窗口之前先跑本工具。' +
+      '触发词：编辑酶、Cas9、Cas12、有哪些编辑器、PAM 规则、spacer 长度、切割位点、碱基编辑器、CBE、ABE、编辑窗口。',
     parameters: {},
     op: 'profile_list',
     timeoutMs: 60_000,
@@ -220,6 +223,36 @@ export function registerTools(ctx) {
     },
     op: 'rank_candidates',
     timeoutMs: 60_000,
+  })))
+
+  disposers.push(ctx.tools.register(graftTool({
+    name: 'graft_base_edit',
+    description:
+      '碱基编辑设计（CBE/ABE）：枚举碱基编辑候选——窗口内可编辑碱基 + bystander + 密码子后果。' +
+      '**只做确定性几何**：目标碱基落在核心窗口内 = 「几何兼容」；本工具**不预测**编辑效率与产物纯度' +
+      '（见返回体的 profile.applicability 与 geometry_vs_efficiency）。' +
+      '内置编辑器（窗口均已核一手文献，返回值带五层结构 targeting/chemistry/activity/evidence/applicability）：' +
+      'BE3、BE4max（CBE，C→T，窗口位置 4–8；Komor 2016 / Koblan 2018）、' +
+      'ABE7.10（ABE，A→G，窗口位置 4–7；Gaudelli 2017）。' +
+      '**窗口编号约定**：位置 1 = protospacer 的 PAM-distal 端，PAM 记为 21–23。' +
+      '必须同时看三件套，否则反链 guide 会被说错：guide_strand / edited_physical_strand / ' +
+      'reference_reported_substitution（例：反链 guide 的 C→T 在参考正链上表现为 **G→A**）。' +
+      '窗口内第二个同底物碱基 = **bystander**（产物不纯），工具会列进 editable_positions 并给警告——' +
+      '报告不能只写「实现了 C→T」。' +
+      '密码子后果需显式声明 cds_start_0（未声明时返回 not_applicable，**不猜读码框**；' +
+      'cds_strand="-" 当前不支持）。' +
+      '触发词：碱基编辑、CBE、ABE、C→T、A→G、bystander、点突变、无义突变、终止密码子、碱基编辑器。',
+    parameters: {
+      sequence: { type: 'string', required: true, description: '目标序列（FASTA 或裸 DNA；编辑窗口按该序列的 + 链坐标报告）' },
+      editor: { type: 'string', description: '碱基编辑器名（BE3 / BE4max / ABE7.10；默认 BE3；先用 graft_profiles 查）' },
+      cds_start_0: { type: 'number', description: 'CDS 起点（0-based）；给了才算密码子后果（synonymous/missense/nonsense/stop_loss）' },
+      cds_strand: { type: 'string', enum: ['+', '-'], description: 'CDS 所在链（默认 +；"-" 当前不支持密码子后果，会显式标注）' },
+      strand: { type: 'string', enum: ['both', '+', '-'], description: '扫描哪条链（默认 both）' },
+      include_broader_window: { type: 'boolean', description: 'true=用更宽的观测窗口（如 CBE 2–8）而非核心窗口（默认 false）' },
+      top_n: { type: 'number', description: '返回候选数上限（默认 100；单碱基（无 bystander）的候选排前）' },
+    },
+    op: 'base_edit_design',
+    timeoutMs: 120_000,
   })))
 
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-bio-graft: tools disposal')

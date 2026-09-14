@@ -44,6 +44,8 @@ for _stream, _kwargs in ((sys.stdin, {'encoding': 'utf-8'}),
 
 from editors import EDITORS, get_editor
 from guides import enumerate_guides, score_guides
+from base_editors import base_editors_summary, get_base_editor
+from base_edit import design_base_edit
 from offtarget import (casoffinder_scan, locate_casoffinder, ensure_casoffinder,
                        offtarget_devices)
 from rank import rank_candidates
@@ -68,8 +70,11 @@ def _sanitize_json(obj):
 
 
 OPS = {
-    'profile_list': lambda args: {'editors': [e.public_summary() for e in EDITORS.values()]},
+    'profile_list': lambda args: {'editors': [e.public_summary() for e in EDITORS.values()],
+                                  'base_editors': base_editors_summary()},
     'profile_get':  lambda args: get_editor(args['editor']).public_summary(),
+    'base_editor_get': lambda args: get_base_editor(args['editor']).public_summary(),
+    'base_edit_design': lambda args: design_base_edit(**args),
     'guide_enumerate': lambda args: enumerate_guides(**args),
     'guide_score': lambda args: score_guides(**args),
     'offtarget_scan': lambda args: casoffinder_scan(**args),
