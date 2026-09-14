@@ -125,7 +125,9 @@ _register(NucleaseProfile(
 def get_editor(name: str) -> NucleaseProfile:
     e = EDITORS.get(name)
     if e is None:
-        raise KeyError(f'unknown editor {name!r}; available: {sorted(EDITORS)}')
+        # 语义错误用 ValueError：KeyError 会被 graft_ops 的「缺参数」处理器误报成
+        # "missing required arg"，把 agent 引向错误的排查方向（实测）。
+        raise ValueError(f'unknown editor {name!r}; available: {sorted(EDITORS)}')
     return e
 
 

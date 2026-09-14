@@ -28,8 +28,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if sys.platform == 'win32':
+    # stdout 必须 UTF-8（JSON 契约）；stderr 同样要 UTF-8 —— 否则中文异常信息
+    # 按控制台 GBK 编码写出，进 traceback → TS 桥把乱码当成「需要修复」的线索给 agent。
     try:
         sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     except Exception:
         pass
 
