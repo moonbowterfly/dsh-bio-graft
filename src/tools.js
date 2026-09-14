@@ -100,6 +100,11 @@ export function registerTools(ctx) {
       '② queries（显式 spacer+PAM 字面量列表）；③ pattern（配合 queries 用，如 N20NGG）。' +
       '每条命中返回 chromosome / position_0based / position_1based / matched_sequence（错配碱基小写）/' +
       'strand / mismatches / mismatch_positions_1based。' +
+      '**批次 C 起返回结构化语义**：① search_completeness——**枚举哪些维度没搜**' +
+      '（dna_bulge/rna_bulge/structural_variation/sample_variants 恒为 not_searched；' +
+      '「没搜」≠「搜了没命中」）；② assessment.safety_conclusion 恒为 not_supported' +
+      '（API 里不存在 safe:true / risk_level，禁词清单见 forbidden_phrasing）；' +
+      '③ per_guide——每条 query 的命中数/mismatch 分布/seed 区命中数/最近位点/是否含精确匹配。' +
       'preflight_only=true 时只做基因组体检（记录数/总 bp/N 比例/是否 CRLF）不扫描——' +
       '**长扫描前建议先 preflight**。device 默认 auto（本机若没有 CPU OpenCL 设备会自动改用 GPU 并回显实际设备）。' +
       '⚠️ **铁律：本工具的结果不能得出「安全」/「无脱靶」结论**——只能说' +

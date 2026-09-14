@@ -39,6 +39,9 @@ import tempfile
 import urllib.request
 import zipfile
 
+from offtarget_interpret import (aggregate_per_guide, build_assessment,
+                                 build_search_completeness)
+
 CAS_OFFINDER_URL = ('https://github.com/snugel/cas-offinder/releases/download/'
                     '2.4.1/cas-offinder_windows_x86-64.zip')  # x86-64（非 x86_64）
 graft_data_dir = os.path.expanduser('~/.dsh/dsh-bio-graft')
@@ -366,6 +369,7 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
                      pattern: str | None = None, mismatches: int = 3,
                      device: str = 'auto', top_n: int = 200,
                      output: str | None = None, preflight_only: bool = False,
+                     seed_length: int = 8, pam_side: str = '3prime',
                      workdir: str | None = None) -> dict:
     """跑一次 Cas-OFFinder 扫描（三段式 input 组装 + 设备自选 + 结构化解析）。
 
@@ -389,8 +393,10 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
                 'interpretation_boundary': INTERPRETATION_BOUNDARY}
 
     if candidates:
+        from editors import get_editor  # 同目录模块（脚本目录由 graft_ops 注入 sys.path）
         queries, derived_pattern = queries_from_candidates(candidates, editor)
         pattern = pattern or derived_pattern
+        pam_side = get_editor(editor).pam_side   # seed 窗口方向随编辑器而定
     if not queries:
         raise ValueError('queries 或 candidates 至少给一个')
     pattern = pattern or 'N20NGG'
@@ -434,6 +440,11 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
         'ok': True,
         'mode': 'scan',
         'backend': {'path': exe, 'source': exe_info.get('source')},
+        # ── 批次 C 语义层：只给 observation，不给结论 ──────────────────────────
+        'search_completeness': build_search_completeness(mismatch_searched=True),
+        'assessment': build_assessment(),
+        'per_guide': aggregate_per_guide(hits, queries, seed_length=seed_length,
+                                         pam_side=pam_side),
         'search_parameters': {
             'genome_file': genome_file.replace('\\', '/'),
             'genome_size_bytes': genome_check.get('size_bytes'),
