@@ -1,6 +1,6 @@
 {
   "name": "@dsh-bio/dsh-bio-graft",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "基因编辑设计插件：sgRNA 候选枚举 + 评分向量（不打综合分）+ Cas-OFFinder 脱靶扫描（BSD-3）+ EditPlan 可审计账本 + 风险分级门控 | CRISPR / gene-editing design specialty plugin for dsh",
   "repository": {
     "type": "git",

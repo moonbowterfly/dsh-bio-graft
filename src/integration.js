@@ -13,6 +13,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { pythonCandidates } from './python.js'
+import { PLUGIN_VERSION, PLUGIN_ID } from './version.js'
 
 export const INTEGRATION_PREFIX = '/api/dsh-bio-graft/integration'
 export const PROTOCOL_MAJOR = 1
@@ -25,8 +26,8 @@ export const INTEGRATION_FEATURES = [
   'cas-offinder',
 ]
 
-const PLUGIN_ID = 'dsh-bio-graft'
-const PLUGIN_VERSION = '0.1.0'
+/** 短名（历史载荷字段 `plugin` 用短名；完整包名见 PLUGIN_ID）。 */
+const PLUGIN = PLUGIN_ID.split('/').pop()
 
 function defaultDataRoot() {
   const dshHome = process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
@@ -124,7 +125,7 @@ export function createIntegrationService() {
     const nonOk = Object.entries(checks).filter(([, v]) => v?.status !== 'ok')
     const state = nonOk.length === 0 ? 'ready' : 'degraded'
     const value = {
-      plugin: PLUGIN_ID,
+      plugin: PLUGIN,
       pluginVersion: PLUGIN_VERSION,
       state,
       checks,
