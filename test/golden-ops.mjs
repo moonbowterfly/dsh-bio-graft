@@ -113,6 +113,18 @@ const created = op('plan_create', {
   intent: { target: 'fixture', desired_change: 'knockout', modality: 'nuclease' },
 })
 check('plan_create returns run_number 1', created.run_number === 1, `got ${created.run_number}`)
+check('plan_create(new) warns when reference.sequence_hash is missing (审计可归因)',
+  Array.isArray(created.warnings) && created.warnings.some((w) => w.includes('sequence_hash')),
+  JSON.stringify(created.warnings))
+
+// 反例：给了 sequence_hash 就不该有这个提醒
+const withHash = op('plan_create', {
+  plan_dir: planDir, plan_name: 'golden_hash_ref', action: 'new',
+  reference: { organism: 'synthetic', assembly: 'n/a', sequence_hash: 'sha256:deadbeef' },
+})
+check('no digest warning when sequence_hash is provided',
+  !Array.isArray(withHash.warnings) || !withHash.warnings.some((w) => w.includes('sequence_hash')),
+  JSON.stringify(withHash.warnings))
 
 // 删掉 001 后再追加：旧实现用「文件数 + 1」会撞号重写历史，新实现必须取 max+1
 rmSync(created.run_file, { force: true })
