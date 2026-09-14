@@ -60,7 +60,7 @@ reference / backend / ranking policy 变了。
 `zero_hit_warning`（列出常见假阴性原因：基因组版本不符 / query 方向 / mismatch 过严 /
 N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高分位点」。
 
-## 工具（9 个语义化工具）
+## 工具（10 个语义化工具）
 
 | 工具 | 说明 |
 |---|---|
@@ -70,6 +70,7 @@ N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-须显式权重）：输出 `policy_id`+`policy_digest`，被剔除候选带原因，缺数据按 `not_searched` 处理 |
 | `graft_offtarget` | Cas-OFFinder 批量脱靶扫描 → **结构化命中** + `search_completeness`（枚举没搜的维度）+ `assessment`（拒绝安全结论）+ `per_guide` 汇总；支持 `preflight_only` 基因组体检、`device=auto` |
 | `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + **bystander** + 密码子后果（synonymous/missense/nonsense/stop_loss）；链语义三件套（反链 C→T 在参考正链上是 G→A）；五层 profile 带 `window_evidence` |
+| `graft_strategy` | **多 guide 策略评估**（几何 + 组合事实）：`deletion_pair`（预测缺失区间/长度/连接点/移码）、`paired_nickase`（异链 + 间距）；每对候选附 **pairwise 脱靶组合**（不是风险相加；缺数据=not_searched）；未实现策略（prime_edit/hdr/multiplex）显式拒绝 |
 | `graft_backend_status` | 后端探测（`status`）/ OpenCL 设备列表（`devices`）/ 自动安装（`ensure`，仅 Windows） |
 | `graft_plan_save` | EditPlan 写入（new / add_run / update_recommendation） |
 | `graft_plan_load` | EditPlan 读回（plan + 全部 runs 时间线） |

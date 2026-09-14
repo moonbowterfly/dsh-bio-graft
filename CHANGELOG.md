@@ -25,6 +25,10 @@
   （synonymous/missense/nonsense/stop_loss）；内置 BE3 / BE4max / ABE7.10（窗口均经一手文献核对，
   带计数约定与出处）；**链语义三件套**（反链 guide 的 C→T 在参考正链上表现为 G→A）；
   **只做几何、不预测活性**（`efficiency_model_available=false`）。
+- **`graft_strategy`**：多 guide 策略评估（几何 + 组合事实）—— `deletion_pair`（预测缺失区间 / 长度 /
+  连接点 / 是否移码）、`paired_nickase`（异链 + 间距窗口）；每对候选附 **pairwise 脱靶组合**
+  （同染色体、间距在窗口内 → 可能共同造成缺失；**不是把两条 guide 的风险相加**；缺数据 = `not_searched`）；
+  未实现策略（`prime_edit` / `hdr` / `multiplex_knockout`）**显式拒绝**，不给出看似可行的假设计。
 - **`graft_offtarget` 语义层**：`search_completeness`（**枚举没搜的维度**：bulge/结构变异/样本变异）、
   `assessment`（`safety_conclusion` 恒为 `not_supported`；API 里不存在 `safe:true`）、
   `per_guide`（mismatch 分布 / seed 区命中 / 最近位点）；`preflight_only` 基因组体检；`device=auto`。

@@ -255,5 +255,34 @@ export function registerTools(ctx) {
     timeoutMs: 120_000,
   })))
 
+  disposers.push(ctx.tools.register(graftTool({
+    name: 'graft_strategy',
+    description:
+      'EditStrategy 多 guide 策略评估（**几何 + 组合事实，不做效率预测**）。' +
+      '多 guide 不能只当成一串 Guide[]：两条 guide 的切点共同决定删掉哪一段，' +
+      '而**双 guide 的风险不是两个单 guide 风险的相加**。' +
+      'strategy 取值：`deletion_pair`（双 guide 缺失：给出预测缺失区间 [cut_left, cut_right) / 长度 / ' +
+      '连接点规则 / 是否移码（需 cds_start_0）/ 是否覆盖声明区段）、' +
+      '`paired_nickase`（配对切口酶：只保留异链且间距 ≤ max_offset_bp 的组合）、' +
+      '`single_cut`（提示直接用 graft_design/graft_rank）、' +
+      '`multiplex_knockout` / `prime_edit` / `hdr`（**未实现 → 显式拒绝，不给出看似可行的假设计**）、' +
+      '`base_edit`（指向 graft_base_edit）。' +
+      '每对候选附 **pairwise 脱靶组合**（两条 guide 的脱靶命中同染色体、间距在窗口内 → 可能共同造成缺失）；' +
+      '**必须两条都有 offtarget 命中数据才算**，否则返回 not_searched（缺失 ≠ 无风险）。' +
+      '触发词：双 guide、配对、大片段缺失、deletion、双切口、paired nickase、多 guide、策略。',
+    parameters: {
+      candidates: { type: 'array', required: true, description: '候选数组（来自 graft_design；建议先用 graft_rank 过滤）', items: { type: 'object', additionalProperties: true } },
+      strategy: { type: 'string', enum: ['single_cut', 'deletion_pair', 'paired_nickase', 'multiplex_knockout', 'base_edit', 'prime_edit', 'hdr'], description: '策略类型（默认 deletion_pair）' },
+      region_start_0: { type: 'number', description: '希望删除的区段起点（0-based；deletion_pair 用，用于筛选完整覆盖该区段的组合）' },
+      region_end_0: { type: 'number', description: '希望删除的区段终点（0-based 半开）' },
+      cds_start_0: { type: 'number', description: 'CDS 起点（0-based）；给了才判断缺失是否移码' },
+      max_offset_bp: { type: 'number', description: 'paired_nickase 的最大间距（默认 200）' },
+      pairwise_window_bp: { type: 'number', description: 'pairwise 脱靶组合的最大间距（默认 10000）' },
+      top_n: { type: 'number', description: '返回组合数上限（默认 20）' },
+    },
+    op: 'evaluate_strategy',
+    timeoutMs: 60_000,
+  })))
+
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-bio-graft: tools disposal')
 }

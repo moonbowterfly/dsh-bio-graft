@@ -57,7 +57,7 @@ Every result carries a machine-readable `interpretation_boundary`; zero hits add
 `zero_hit_warning` listing the usual false-negative causes. The only allowed phrasing is
 "no high-scoring site detected under these search parameters".
 
-## Tools (9)
+## Tools (10)
 
 | Tool | Purpose |
 |---|---|
@@ -67,6 +67,7 @@ Every result carries a machine-readable `interpretation_boundary`; zero hits add
 | `graft_rank` | **Declarative ranking** (pareto / lexicographic / weighted-with-explicit-weights): returns `policy_id` + `policy_digest`, per-candidate exclusion reasons, and treats missing data as `not_searched` (never a silent pass) |
 | `graft_offtarget` | Cas-OFFinder scan → **structured hits** + `search_completeness` (what was *not* searched) + `assessment` (refuses safety conclusions) + `per_guide` aggregation; supports `preflight_only` genome checks and `device=auto` |
 | `graft_base_edit` | **Base-editing design** (CBE/ABE): editable bases in the window + **bystanders** + codon consequences (synonymous/missense/nonsense/stop_loss); strand semantics triad (a minus-guide C→T is a **G→A** on the reference plus strand); five-layer profile with `window_evidence` |
+| `graft_strategy` | **Multi-guide strategy evaluation** (geometry + combination facts): `deletion_pair` (predicted deletion interval / size / junction rule / frameshift), `paired_nickase` (cross-strand + offset); every pair carries a **pairwise off-target combination** (not summed risk; missing data = `not_searched`); unimplemented strategies (prime_edit/hdr/multiplex) are refused honestly |
 | `graft_backend_status` | Backend probe (`status`) / OpenCL device list (`devices`) / auto-install (`ensure`, Windows only) |
 | `graft_plan_save` | EditPlan write (`new` / `add_run` / `update_recommendation`) |
 | `graft_plan_load` | EditPlan read-back (plan + full runs timeline) |

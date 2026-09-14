@@ -49,6 +49,7 @@ from base_edit import design_base_edit
 from offtarget import (casoffinder_scan, locate_casoffinder, ensure_casoffinder,
                        offtarget_devices)
 from rank import rank_candidates
+from strategy import evaluate_strategy
 from plans import plan_create, plan_load
 
 
@@ -82,6 +83,7 @@ OPS = {
     'offtarget_ensure': lambda args: ensure_casoffinder(),
     'offtarget_devices': lambda args: offtarget_devices(),
     'rank_candidates': lambda args: rank_candidates(**args),
+    'evaluate_strategy': lambda args: evaluate_strategy(**args),
     'plan_create': lambda args: plan_create(**args),
     'plan_load': lambda args: plan_load(**args),
 }

@@ -40,6 +40,7 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 |---|---|---|
 | 打断基因 / 敲除（不要求精确序列） | nuclease（NHEJ indel） | `graft_design` |
 | 精确单碱基替换（C→T 或 A→G），且目标碱基落在编辑窗口内 | **碱基编辑** | `graft_base_edit` |
+| 删除一段（大片段缺失，单切口难做到的成对切割） | **双 guide 缺失 / 配对切口酶** | `graft_strategy`（几何 + pairwise；多 guide ≠ Guide[]，**风险不相加**） |
 | 插入 / 大片段替换 / 精确多重编辑 | prime editing 或 HDR —— **本插件未实现**，如实说明并给设计要点 | —（不许假装支持） |
 | 敲低而非敲除（不改变序列） | CRISPRi/a —— **未实现** | —（如实说明） |
 
@@ -57,6 +58,7 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 | `graft_score` | 单独对候选列表打分（复用） |
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-显式权重）；返回 policy_id + policy_digest + 被剔除原因；负证据语义（数据缺失=not_searched，绝不静默通过） |
 | `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + bystander + 密码子后果；只做几何不预测活性；链语义三件套（反链 C→T = 参考正链 G→A） |
+| `graft_strategy` | **多 guide 策略**（deletion_pair / paired_nickase）：预测缺失区间/长度/连接点/移码 + **pairwise 脱靶组合**（风险不相加）；未实现策略显式拒绝 |
 | `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3，需用户准备 genome FASTA + 模式文件） |
 | `graft_backend_status` | 后端探测/ensure 安装 Cas-OFFinder |
 | `graft_plan_save` | EditPlan 写入（new/add_run/update_recommendation） |
