@@ -26,6 +26,7 @@ const EXPECTED = [
   'graft_plan_load',
   'graft_plan_save',
   'graft_profiles',
+  'graft_rank',
   'graft_score',
 ]
 

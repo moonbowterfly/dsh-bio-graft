@@ -188,5 +188,34 @@ export function registerTools(ctx) {
     timeoutMs: 60_000,
   })))
 
+  disposers.push(ctx.tools.register(graftTool({
+    name: 'graft_rank',
+    description:
+      '按**声明式策略**给候选排名（graft_rank）—— 不产生综合分/质量分，只回答' +
+      '「在声明的策略下 A 是否优于 B」，并把整个 policy 随结果一起返回（policy_id + policy_digest），' +
+      '供 graft_plan_save 的 ranking_policy 字段落账本（回答「为什么昨天 B 今天 D」）。' +
+      '三种策略：pareto（默认，支配关系：不引入价值偏好时唯一客观的表达，返回 pareto_front 与 ' +
+      'dominated_by）、lexicographic（字典序，order=["template_hits:min","max_self_palindrome:min",' +
+      '"gc_abs_dev:min"] 声明哪个 criterion 更重要）、weighted（**必须显式给 weights**，' +
+      '否则报错；返回 declared_objective_value = 按声明权重的线性组合并附 disclaimer）。' +
+      'hard_filters 支持硬约束（template_hits_max / gc_min|gc_max / max_self_palindrome_max / ' +
+      'homopolymer_max_max / offtarget_total_max / offtarget_mm0_max… / exclude_warnings），' +
+      '被剔除的候选带 reasons；**依赖的数据缺失时按 not_searched 处理并剔除说明——绝不静默通过**。' +
+      '可用度量：template_hits / gc_content / gc_abs_dev / max_self_palindrome / homopolymer_max / ' +
+      'cut_site_0 / offtarget_total / offtarget_mm0..3。' +
+      '触发词：排序、排名、选最优 guide、多目标、Pareto、按什么排、挑一个 guide。',
+    parameters: {
+      candidates: { type: 'array', required: true, description: 'graft_design/graft_score 输出的候选数组（可含 graft_offtarget 回填的 offtarget_summary）', items: { type: 'object', additionalProperties: true } },
+      policy: { type: 'string', enum: ['pareto', 'lexicographic', 'weighted'], description: '排序策略（默认 pareto）' },
+      order: { type: 'array', items: { type: 'string' }, description: 'lexicographic 的度量序列，如 ["template_hits:min","gc_abs_dev:min"]' },
+      objectives: { type: 'array', items: { type: 'string' }, description: 'pareto 的目标序列（默认 template_hits:min / max_self_palindrome:min / gc_abs_dev:min）' },
+      weights: { type: 'object', additionalProperties: true, description: 'weighted 的显式权重 {metric: weight}（原始单位，不做默认加权）' },
+      hard_filters: { type: 'object', additionalProperties: true, description: '硬约束，如 {template_hits_max:1, gc_min:0.35, gc_max:0.7}' },
+      top_n: { type: 'number', description: '只返回前 N 名（excluded 仍全量返回）' },
+    },
+    op: 'rank_candidates',
+    timeoutMs: 60_000,
+  })))
+
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-bio-graft: tools disposal')
 }

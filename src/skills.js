@@ -17,8 +17,9 @@ export function registerSkills(ctx) {
   disposers.push(ctx.skills.register({
     name: 'graft-expert',
     description:
-      '基因编辑设计主指引：工具分层选择（graft_profiles/design/score/offtarget/plan_save/plan_load）、'
-      + '编辑生命周期工作流（TARGET→DESIGN→RANK→VERIFY→AUDIT）、score vector 哲学（禁止综合分）、'
+      '基因编辑设计主指引：工具分层选择（graft_profiles/design/score/rank/offtarget/plan_save/plan_load）、'
+      + '编辑生命周期工作流（TARGET→DESIGN→RANK→VERIFY→AUDIT）、score vector 哲学（禁止综合分；'
+      + '排名由 graft_rank 按声明策略完成并落账本）、负证据语义（0/null/not_searched 必须区分）、'
       + 'EditPlan 账本、脱靶铁律（永不说 safe）、风险分级门控（Level 0-3）、安全边界。',
     whenToUse:
       '设计 sgRNA/CRISPR 敲除敲入、碱基编辑、prime editing、脱靶评估、'

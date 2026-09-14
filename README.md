@@ -53,13 +53,14 @@ reference / backend / ranking policy 变了。
 `zero_hit_warning`（列出常见假阴性原因：基因组版本不符 / query 方向 / mismatch 过严 /
 N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高分位点」。
 
-## 工具（7 个语义化工具）
+## 工具（8 个语义化工具）
 
 | 工具 | 说明 |
 |---|---|
 | `graft_profiles` | 内置 NucleaseProfile 注册表（PAM/spacer/几何 + `verified`/`pam_source` 证据分级） |
 | `graft_design` | PAM 双向扫描枚举 sgRNA + 评分向量 + **切割位点**（IUPAC 感知；FASTA/裸序列/多条 FASTA） |
 | `graft_score` | 对已有候选补打评分向量（不打综合分） |
+| `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-须显式权重）：输出 `policy_id`+`policy_digest`，被剔除候选带原因，缺数据按 `not_searched` 处理 |
 | `graft_offtarget` | Cas-OFFinder 批量脱靶扫描 → **结构化命中**（染色体/0-based 与 1-based 坐标/错配位置/链）；支持 `preflight_only` 基因组体检、`device=auto` |
 | `graft_backend_status` | 后端探测（`status`）/ OpenCL 设备列表（`devices`）/ 自动安装（`ensure`，仅 Windows） |
 | `graft_plan_save` | EditPlan 写入（new / add_run / update_recommendation） |

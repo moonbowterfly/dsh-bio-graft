@@ -24,7 +24,9 @@ language: python
 ```
 TARGET    明确编辑目标（序列/坐标/物种/组装版本/编辑意图 desired_change）
 DESIGN    graft_profiles 先看编辑酶 → graft_design 枚举候选 → graft_score 评分向量
-RANK      graft_plan_save(action=update_recommendation) 按 objective 排序——
+RANK      用 **graft_rank** 按声明策略排名（pareto / lexicographic / 显式 weighted）——
+          排序必须由工具完成并输出 policy_id + policy_digest，再用
+          graft_plan_save(action=update_recommendation, ranking_policy=<policy 载荷>) 落账本；
           排序解释要保留证据：「B 的活性略高但 D 的脱靶更低，按本 objective 推荐 D」
 VERIFY    graft_plan_save(action=add_run) 记录 validation_plan（引物/测序策略）
 AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B 今天 D」
@@ -37,6 +39,7 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 | `graft_profiles` | 列出内置 NucleaseProfile（PAM/geometry/scoring 文献引用） |
 | `graft_design` | sgRNA 枚举 + 评分向量（不打综合分） |
 | `graft_score` | 单独对候选列表打分（复用） |
+| `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-显式权重）；返回 policy_id + policy_digest + 被剔除原因；负证据语义（数据缺失=not_searched，绝不静默通过） |
 | `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3，需用户准备 genome FASTA + 模式文件） |
 | `graft_backend_status` | 后端探测/ensure 安装 Cas-OFFinder |
 | `graft_plan_save` | EditPlan 写入（new/add_run/update_recommendation） |
@@ -51,8 +54,13 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 1. **Off-target 永不说 safe**——「No computational off-target method may
    label a design as safe」。只能说「在当前搜索参数下未检出高分位点」
    / 「预测风险较低或较高」/「在 XX 组学文库功能注释里有 XX 提示」。
-2. **保留评分向量，禁止综合分**——「87.3 分」是伪精确；agent 必须能
-   解释「A 活性略高、B 脱靶更低，按本 objective 推荐 B」。
+2. **保留评分向量，禁止综合分**——「87.3 分」是伪精确；**排名必须由 `graft_rank` 完成**并保留
+   `policy_id`/`policy_digest`（策略随结果落账本）；agent 必须能解释「A 活性略高、B 脱靶更低，
+   按本 objective 推荐 B」。`graft_rank` 的 `weighted` 模式**必须显式给权重**，其
+   `declared_objective_value` 不得当作结论引用。
+2b. **负证据语义**：`0` / `null` / `not_searched` / `not_applicable` 必须区分——
+   「没做过该分析」绝不能表述成「结果为 0」或「无风险」。graft_rank 的硬过滤在数据缺失时
+   会剔除并说明；agent 引用时也必须把缺失讲清楚。
 3. **所有修改走 graft_plan_save 追加 run**，不覆盖——可审计。
 4. **关键参数必须由工具输出，不要心算**——gc/坐标全部来自 graft_design。
 5. **风险分级门控**（risk_context，写在 EditPlan.risk_flags）：

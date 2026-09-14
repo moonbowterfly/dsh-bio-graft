@@ -62,6 +62,7 @@ agent 工具调用
 | `python/sequtil.py` | 序列规范化（FASTA/多行/多条）、反向互补、GC | 清洗规则**单点实现**（旧实现分散导致贪婪正则吞序列的缺陷） |
 | `python/editors.py` | `NucleaseProfile` 注册表 | PAM/spacer/几何**只此一处**；带 `verified`/`pam_source` 证据分级 |
 | `python/guides.py` | 候选枚举 + 评分向量 + 切割位点 | IUPAC 感知 PAM；坐标口径写进返回值；不打综合分 |
+| `python/rank.py` | 声明式排名（hard filter / lexicographic / pareto / weighted-显式权重） | 秩是 policy-dependent（返回 policy_id+digest）；**禁隐式加权**；缺数据=not_searched 必须剔除说明 |
 | `python/offtarget.py` | Cas-OFFinder 后端（组装输入/设备选择/解析/体检） | 三段式 input；`interpretation_boundary` 恒在；0 命中必带排查提示 |
 | `python/plans.py` | EditPlan 资产 + append-only 账本 | run 号单调只增；原子写；同名不覆盖 |
 | `python/graft_ops.py` | JSON 协议分发器 | op 注册表是 TS 工具层的对端（契约测试双向校验） |

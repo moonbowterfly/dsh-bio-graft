@@ -12,6 +12,7 @@
     "graft_profiles",
     "graft_design",
     "graft_score",
+    "graft_rank",
     "graft_offtarget",
     "graft_backend_status",
     "graft_plan_save",
