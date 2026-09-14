@@ -120,4 +120,31 @@ try {
 }
 check('weighted without explicit weights fails loudly (no implicit weights)', noWeights)
 
+// ---------- ⑥ 脱靶摘要的两种形态都要认（真实会话：agent 手工合并时产出扁平形态）----------
+const flat = {
+  protospacer: 'G'.repeat(20), pam: 'TGG', start_0: 1, end_0: 24, strand: '+',
+  template_hits: 1,
+  on_target_scores: { gc_content: 0.5, max_self_palindrome: 4, homopolymer_runs: [] },
+  offtarget_summary: { offtarget_total: 2, offtarget_mm0: 1, offtarget_mm1: 1, offtarget_mm2: 0, offtarget_mm3: 0 },
+}
+const flatRanked = op('rank_candidates', {
+  candidates: [flat],
+  policy: 'lexicographic',
+  order: ['offtarget_mm0:min'],
+  hard_filters: { offtarget_total_max: 5, offtarget_mm0_max: 1 },
+})
+check('flat offtarget_summary shape is understood (not treated as not_searched)',
+  flatRanked.n_ranked === 1 &&
+  flatRanked.ranked[0].vector_values.offtarget_mm0 === 1,
+  JSON.stringify({ n: flatRanked.n_ranked, excl: flatRanked.excluded }))
+
+// ---------- ⑦ 未知 filter 名必须列出可用名（agent 自纠错的最小信息量）----------
+let errText = ''
+try {
+  op('rank_candidates', { candidates: [A], policy: 'lexicographic', order: ['template_hits:min'], hard_filters: { gc_min: 0.3 } })
+} catch (e) { errText = e.message }
+check('unknown filter name lists the valid names',
+  /gc_min/.test(errText) && /gc_content_min/.test(errText) && /可用/.test(errText),
+  errText.slice(0, 160))
+
 summary('rank')

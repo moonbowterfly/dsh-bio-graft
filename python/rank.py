@@ -32,6 +32,20 @@ def _offtarget(c: dict) -> dict:
     return (c.get('offtarget_summary') or {}) if isinstance(c, dict) else {}
 
 
+def _offtarget_total(c: dict):
+    ot = _offtarget(c)
+    v = ot.get('total')
+    if v is not None:
+        return v
+    # 兼容扁平形态（agent 手工合并工具输出时常见）：offtarget_total / total
+    for key in ('offtarget_total', 'total'):
+        if key in ot:
+            return ot[key]
+        if isinstance(c, dict) and key in c:
+            return c[key]
+    return None
+
+
 def _gc(c: dict):
     v = _scores(c).get('gc_content', c.get('gc_content') if isinstance(c, dict) else None)
     return None if v is None else float(v)
@@ -45,10 +59,28 @@ def _homopolymer_max(c: dict):
 
 
 def _offtarget_mm(c: dict, k: int):
-    mm = _offtarget(c).get('hits_by_mismatch')
-    if not isinstance(mm, dict):
-        return None
-    return mm.get(str(k), mm.get(k))
+    """取某 mismatch 档的命中数。**两种形态都认**：
+       嵌套 `offtarget_summary.hits_by_mismatch = {"0": n}`；
+       扁平 `offtarget_summary.offtarget_mm0 = n` 或候选顶层 `offtarget_mm0 = n`。
+       （真实会话实测：agent 手工合并 graft_offtarget 输出时常产出扁平形态，
+       只认嵌套形态会把整批候选误判成 not_searched。）
+       返回 None = 该数据确实没有（此时按 not_searched 处理）。"""
+    ot = _offtarget(c)
+    mm = ot.get('hits_by_mismatch')
+    if isinstance(mm, dict):
+        v = mm.get(str(k), mm.get(k))
+        if v is not None:
+            return v
+    for key in (f'offtarget_mm{k}', f'mm{k}'):
+        if key in ot:
+            return ot[key]
+        if isinstance(c, dict) and key in c:
+            return c[key]
+    return None
+
+
+def _valid_filter_names() -> list[str]:
+    return sorted([f'{m}_{d}' for m in METRICS for d in ('min', 'max')] + ['exclude_warnings'])
 
 
 METRICS = {
@@ -59,7 +91,7 @@ METRICS = {
                                                      c.get('max_self_palindrome') if isinstance(c, dict) else None), 'min'),
     'homopolymer_max': (_homopolymer_max, 'min'),
     'cut_site_0': (lambda c: c.get('cut_site_0') if isinstance(c, dict) else None, 'min'),
-    'offtarget_total': (lambda c: _offtarget(c).get('total'), 'min'),
+    'offtarget_total': (_offtarget_total, 'min'),
     'offtarget_mm0': (lambda c: _offtarget_mm(c, 0), 'min'),
     'offtarget_mm1': (lambda c: _offtarget_mm(c, 1), 'min'),
     'offtarget_mm2': (lambda c: _offtarget_mm(c, 2), 'min'),
@@ -113,7 +145,8 @@ def _filter_candidate(c: dict, hard_filters: dict | None) -> list[str]:
         if key.endswith('_max') or key.endswith('_min'):
             metric, op = key.rsplit('_', 1)
             if metric not in METRICS:
-                raise ValueError(f'unknown hard filter {key!r}（没有度量 {metric!r}）')
+                raise ValueError(f'unknown hard filter {key!r}（没有度量 {metric!r}）；'
+                                 f'可用的 filter 名：{_valid_filter_names()}')
             value = METRICS[metric][0](c)
             if value is None:
                 reasons.append(f'{metric}=not_searched/missing data —— 无法评估该约束'
@@ -124,7 +157,8 @@ def _filter_candidate(c: dict, hard_filters: dict | None) -> list[str]:
             if op == 'min' and value < limit:
                 reasons.append(f'{metric}={value} < min {limit}')
             continue
-        raise ValueError(f'unsupported hard filter {key!r}')
+        raise ValueError(f'unsupported hard filter {key!r}；'
+                         f'可用的 filter 名：{_valid_filter_names()}')
     return reasons
 
 
