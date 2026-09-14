@@ -28,7 +28,8 @@ RANK      用 **graft_rank** 按声明策略排名（pareto / lexicographic / �
           排序必须由工具完成并输出 policy_id + policy_digest，再用
           graft_plan_save(action=update_recommendation, ranking_policy=<policy 载荷>) 落账本；
           排序解释要保留证据：「B 的活性略高但 D 的脱靶更低，按本 objective 推荐 D」
-VERIFY    graft_plan_save(action=add_run) 记录 validation_plan（引物/测序策略）
+VERIFY    **graft_validation_plan** 生成分档验证要求（required/recommended/conditional + 指标定义）
+          再用 graft_plan_save(action=add_run) 记进账本
 AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B 今天 D」
 ```
 
@@ -59,6 +60,7 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-显式权重）；返回 policy_id + policy_digest + 被剔除原因；负证据语义（数据缺失=not_searched，绝不静默通过） |
 | `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + bystander + 密码子后果；只做几何不预测活性；链语义三件套（反链 C→T = 参考正链 G→A） |
 | `graft_strategy` | **多 guide 策略**（deletion_pair / paired_nickase）：预测缺失区间/长度/连接点/移码 + **pairwise 脱靶组合**（风险不相加）；未实现策略显式拒绝 |
+| `graft_validation_plan` | **验证方案**：按模态+宿主分档（required 不可删）+ 指标带分子/分母/assay + `cannot_conclude`；植物加嵌合/合子性/可遗传 |
 | `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3，需用户准备 genome FASTA + 模式文件） |
 | `graft_backend_status` | 后端探测/ensure 安装 Cas-OFFinder |
 | `graft_plan_save` | EditPlan 写入（new/add_run/update_recommendation） |

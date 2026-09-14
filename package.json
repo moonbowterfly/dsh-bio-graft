@@ -40,7 +40,7 @@
     }
   },
   "scripts": {
-    "test": "node test/tools-contract.mjs && node test/golden-ops.mjs && node test/offtarget-scan.mjs && node test/rank.mjs && node test/base-edit.mjs && node test/strategy.mjs && node test/integration-contract.mjs"
+    "test": "node test/tools-contract.mjs && node test/golden-ops.mjs && node test/offtarget-scan.mjs && node test/rank.mjs && node test/base-edit.mjs && node test/strategy.mjs && node test/validation.mjs && node test/integration-contract.mjs"
   },
   "keywords": [
     "dsh",

@@ -30,6 +30,7 @@ const EXPECTED = [
   'graft_rank',
   'graft_score',
   'graft_strategy',
+  'graft_validation_plan',
 ]
 
 check('registers exactly the documented tool set',

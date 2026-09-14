@@ -284,5 +284,28 @@ export function registerTools(ctx) {
     timeoutMs: 60_000,
   })))
 
+  disposers.push(ctx.tools.register(graftTool({
+    name: 'graft_validation_plan',
+    description:
+      '验证方案（ValidationRequirement[]）：按**模态 + 宿主类型**给出分档验证要求，' +
+      'required（不可删的关键测量）/ recommended / conditional（带触发条件）。' +
+      '每条含「测什么、回答什么问题、为什么、交接给谁」；另附 **EditOutcomeMetrics**' +
+      '（每个指标带 numerator/denominator/assay —— 禁止裸「efficiency = 43」）与 ' +
+      '**cannot_conclude**（本方案不能证明什么：不预测效率、不给安全结论）。' +
+      '模态：nuclease_ko / base_edit / deletion_pair / paired_nickase / hdr / multiplex_knockout；' +
+      '宿主：cell_line（默认）/ plant（额外要求嵌合、合子性、可遗传性；DNA 递送加载体残留）/ animal。' +
+      '两层生成契约：本工具给 Layer 1 事实型要求；agent 结合试剂盒/预算/通量具体化并标 [推断]，' +
+      '但 required 档关键测量不可删。' +
+      '触发词：验证方案、怎么验证、测序方案、验证实验、脱靶验证、敲除验证、编辑验证、指标定义。',
+    parameters: {
+      modality: { type: 'string', required: true, enum: ['nuclease_ko', 'base_edit', 'deletion_pair', 'paired_nickase', 'hdr', 'multiplex_knockout'], description: '编辑模态（决定 required 档）' },
+      host_type: { type: 'string', enum: ['cell_line', 'plant', 'animal'], description: '宿主类型（默认 cell_line；plant/animal 会追加宿主特异要求）' },
+      delivery: { type: 'string', description: '递送方式（如 rnp / dna / plasmid；plant + dna 会提示载体残留检查）' },
+      notes: { type: 'string', description: '补充说明（会原样带回 notes）' },
+    },
+    op: 'validation_plan',
+    timeoutMs: 60_000,
+  })))
+
   ctx.effect(() => () => disposers.forEach((d) => d?.()), 'dsh-bio-graft: tools disposal')
 }

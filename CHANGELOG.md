@@ -29,6 +29,11 @@
   连接点 / 是否移码）、`paired_nickase`（异链 + 间距窗口）；每对候选附 **pairwise 脱靶组合**
   （同染色体、间距在窗口内 → 可能共同造成缺失；**不是把两条 guide 的风险相加**；缺数据 = `not_searched`）；
   未实现策略（`prime_edit` / `hdr` / `multiplex_knockout`）**显式拒绝**，不给出看似可行的假设计。
+- **`graft_validation_plan`**：验证方案（`ValidationRequirement[]`）—— 按模态 + 宿主分档
+  （required / recommended / conditional）；每条含「测什么 / 回答什么问题 / 为什么 / 交接给谁」；
+  **EditOutcomeMetrics** 每个指标带 numerator + denominator + assay（禁止裸「efficiency = 43」）；
+  `cannot_conclude` 显式声明本方案不能证明什么；植物宿主额外要求嵌合/合子性/可遗传性，
+  DNA 递送加载体残留检查。两层生成契约：代码给 Layer 1 事实型要求，agent 结合实验室现实具体化并标 [推断]。
 - **`graft_offtarget` 语义层**：`search_completeness`（**枚举没搜的维度**：bulge/结构变异/样本变异）、
   `assessment`（`safety_conclusion` 恒为 `not_supported`；API 里不存在 `safe:true`）、
   `per_guide`（mismatch 分布 / seed 区命中 / 最近位点）；`preflight_only` 基因组体检；`device=auto`。

@@ -50,6 +50,7 @@ from offtarget import (casoffinder_scan, locate_casoffinder, ensure_casoffinder,
                        offtarget_devices)
 from rank import rank_candidates
 from strategy import evaluate_strategy
+from validation import build_validation_plan
 from plans import plan_create, plan_load
 
 
@@ -84,6 +85,7 @@ OPS = {
     'offtarget_devices': lambda args: offtarget_devices(),
     'rank_candidates': lambda args: rank_candidates(**args),
     'evaluate_strategy': lambda args: evaluate_strategy(**args),
+    'validation_plan': lambda args: build_validation_plan(**args),
     'plan_create': lambda args: plan_create(**args),
     'plan_load': lambda args: plan_load(**args),
 }

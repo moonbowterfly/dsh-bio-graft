@@ -18,7 +18,8 @@
     "graft_base_edit",
     "graft_backend_status",
     "graft_plan_save",
-    "graft_plan_load"
+    "graft_plan_load",
+    "graft_validation_plan"
   ],
   "skill": {
     "name": "graft-expert",

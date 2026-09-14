@@ -66,6 +66,7 @@ agent 工具调用
 | `python/base_editors.py` | `BaseEditorProfile` 五层注册表（targeting/chemistry/activity/evidence/applicability） | 窗口数字必须来自一手文献（带 `window_evidence`）；**geometry 与 efficiency 彻底分开**，不内置效率预测 |
 | `python/base_edit.py` | 碱基编辑设计（窗口内可编辑碱基 + bystander + 密码子后果） | 链语义三件套（反链 C→T = 参考正链 G→A）；缺 CDS 声明→`not_applicable` 不猜读码框 |
 | `python/strategy.py` | `EditStrategy` 多 guide 策略（deletion_pair / paired_nickase）+ pairwise 脱靶组合 | 多 guide ≠ Guide[]；**风险不相加**；未实现策略显式拒绝（不给假设计）；缺数据=not_searched |
+| `python/validation.py` | 验证方案（ValidationRequirement[] + EditOutcomeMetrics） | 分档 required/recommended/conditional；**每个指标必须带分子/分母/assay**；宿主特异项（植物：嵌合/合子性/可遗传/载体残留）；`cannot_conclude` 必带 |
 | `python/offtarget.py` | Cas-OFFinder 后端（组装输入/设备选择/解析/体检） | 三段式 input；`interpretation_boundary` 恒在；0 命中必带排查提示 |
 | `python/plans.py` | EditPlan 资产 + append-only 账本 | run 号单调只增；原子写；同名不覆盖 |
 | `python/graft_ops.py` | JSON 协议分发器 | op 注册表是 TS 工具层的对端（契约测试双向校验） |
