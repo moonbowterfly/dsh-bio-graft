@@ -18,9 +18,18 @@
 | **Cas12b** | PAM **`TTN`**，5′，spacer 20，staggered，cut +17 | ❌ **未核** | ① 本机原始声明是 `TNN`，与 `TTN` 不一致——哪个对？核对 AapCas12b 一手文献（Shmakov 2015 / Teng 2018 / Strecker 2019）；② spacer 长度与切点偏移；③ 是否存在 editing-window 差异 |
 | **Cas13a** | 占位 `NNN`，3′，spacer 22，enzymatic-RNA | ❌ **未核** | Cas13a 靶 RNA、无 DNA PAM 概念（用 PFS/侧翼偏好）；当前为占位声明，designer 未实现（调 `graft_design` 会被明确拒绝） |
 
-## 还需补的外部事实（非 profile 本体）
+## 待评估（不是缺陷，是版本边界与外部事实）
 
-- **Cas-OFFinder 版本与设备行为**：v2.4.1 已实测（三段式 input、0-based 输出、CPU OpenCL 缺失时的行为）。
-  若上游发布新版本，重跑 `test/offtarget-scan.mjs` 的夹具确认契约未变。
-- **bulge 搜索**：Cas-OFFinder 本体不支持，官方用包装脚本 `cas-offinder-bulge`（独立项目）。
-  当前 graft 对 bulge 请求响亮报错；若将来要支持，需重新评估其许可与维护状态后再接入（作为 external adapter）。
+- **Cas-OFFinder 版本边界（2026-09-14 本机核验）**：GitHub releases 上 `2.4.1`（2021-01-23）是**最后一个稳定版**，
+  之后有 `3.0.0b` / `3.0.0b2` / `3.0.0b3`（beta，2021-07-29）。当前插件钉在 2.4.1（稳定 + 已实测通过）。
+  - 3.0.0b3 的 Windows 资产命名是 `cas-offinder_windows_x86_64.zip`（**下划线**），而 2.4.1 是
+    `cas-offinder_windows_x86-64.zip`（**连字符**）——若将来加「指定版本安装」参数，URL 模板必须分别处理。
+  - 3.0.0b3 的 release **无 release notes**（本机 API 核验），无法确认「3.0.0 原生支持 bulge」这一说法；
+    master README 的 changelog 止于 2.3，且明确写 bulge 需独立包装脚本 `cas-offinder-bulge`。
+    **在证实之前不改代码**（外部模型提出、本机无法证实的断言一律只入待评估清单）。
+  - 无论版本如何，**v2.4.1 的「未检出」不可推出「无 bulge 脱靶」**——现状已用「bulge 请求响亮报错 +
+    `search_parameters.bulge: unsupported` + 边界声明」实现该纪律；批次 C 会再加 `search_completeness` 枚举字段。
+- **契约回归**：若上游发布新版本并被采用，必须重跑 `test/offtarget-scan.mjs` 夹具确认三段式 input /
+  0-based 输出 / 设备语义未变。
+- **Cas-OFFinder 设备**：本机无 CPU OpenCL 设备（`C` 直接失败），只能 GPU（`device=auto` 已自动处理）。
+  若将来支持 Linux/macOS 打包，device 语义需重新实测（Linux 常见有 CPU OpenCL runtime）。
