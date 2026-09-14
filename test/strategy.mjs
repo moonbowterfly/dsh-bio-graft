@@ -55,6 +55,18 @@ check('deletion_pair: the designed pair is predicted with the exact deleted inte
   JSON.stringify(pair && { iv: pair.deleted_interval_0based_half_open, size: pair.deleted_size_bp }))
 check('deletion_pair: the pair covers the declared region',
   pair?.covers_declared_region === true, JSON.stringify(pair?.reject_reason))
+check('deletion_pair: covering is "cuts flank the region", with the outside-deletion cost reported',
+  pair?.extra_deleted_bp_outside_region === 0,
+  JSON.stringify({ extra: pair?.extra_deleted_bp_outside_region }))
+check('deletion_pair: non-covering pairs are rejected and counted (not silently mixed in)',
+  typeof del.n_pairs_rejected_not_covering === 'number' &&
+  del.n_pairs_rejected_not_covering >= 1 &&
+  (del.pairs ?? []).every((p) => p.covers_declared_region === true),
+  JSON.stringify({ rejected: del.n_pairs_rejected_not_covering, returned: (del.pairs ?? []).length }))
+check('deletion_pair: pairs are sorted by "least extra deletion outside the region" first',
+  (del.pairs ?? []).every((p, i, arr) => i === 0 ||
+    (arr[i - 1].extra_deleted_bp_outside_region ?? 0) <= (p.extra_deleted_bp_outside_region ?? 0)),
+  JSON.stringify((del.pairs ?? []).slice(0, 5).map((p) => p.extra_deleted_bp_outside_region)))
 check('deletion_pair: frameshift computed from the declared CDS (40 % 3 !== 0)',
   pair?.in_frame === false && /移码/.test(String(pair?.frameshift_note)),
   JSON.stringify({ in_frame: pair?.in_frame }))

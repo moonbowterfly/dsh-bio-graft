@@ -176,20 +176,30 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
                 pair['nickase_offset_bp'] = g['deleted_size_bp']
             elif strategy == 'deletion_pair':
                 if region_start_0 is not None and region_end_0 is not None:
-                    inside = (region_start_0 <= g['deleted_interval_0based_half_open'][0] and
-                              g['deleted_interval_0based_half_open'][1] <= region_end_0)
-                    pair['covers_declared_region'] = inside
-                    if not inside:
+                    cl, cr = g['deleted_interval_0based_half_open']
+                    # 「覆盖声明区段」= 两个切点**夹住**该区段（缺失区间 ⊇ 区段），
+                    # 不是「切点落在区段内」（后者是子区间，反而删不掉区段两端）。
+                    # 真实会话实测：旧判据写反，导致工具返回的全是不覆盖区段的组合，
+                    # agent 独立枚举后发现「工具评估集 ⊄ 我的覆盖集」。
+                    covers = (cl <= region_start_0 and cr >= region_end_0)
+                    pair['covers_declared_region'] = covers
+                    if covers:
+                        pair['extra_deleted_bp_outside_region'] = ((region_start_0 - cl) +
+                                                                   (cr - region_end_0))
+                    else:
                         pair['reject_reason'] = (
-                            f"切点区间 {g['deleted_interval_0based_half_open']} 未完整覆盖声明区段 "
-                            f"[{region_start_0}, {region_end_0})")
+                            f"切点区间 [{cl}, {cr}) 未夹住声明区段 "
+                            f"[{region_start_0}, {region_end_0})：两端各需 cut_left ≤ 起点、"
+                            f"cut_right ≥ 终点")
             pairs.append(pair)
 
+    n_not_covering = 0
     if strategy == 'deletion_pair':
+        n_not_covering = sum(1 for p in pairs if not p.get('covers_declared_region', True))
         pairs = [p for p in pairs if p.get('covers_declared_region', True)]
-        pairs.sort(key=lambda p: (len(p.get('reject_reason') or ''), abs(
-            p['deleted_size_bp'] - ((region_end_0 - region_start_0) if region_start_0 is not None
-                                    and region_end_0 is not None else p['deleted_size_bp']))))
+        # 排序：**区段外附带删除的碱基数越少越精确**（再按缺失长度小→大）
+        pairs.sort(key=lambda p: (p.get('extra_deleted_bp_outside_region', 0),
+                                  p['deleted_size_bp']))
     else:
         pairs.sort(key=lambda p: p.get('nickase_offset_bp', p['deleted_size_bp']))
 
@@ -199,6 +209,7 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
         'zh': meta['zh'],
         'n_candidates': len(candidates),
         'n_pairs_evaluated': len(pairs),
+        'n_pairs_rejected_not_covering': n_not_covering,
         'pairs': pairs[:int(top_n)],
         'pairs_truncated': len(pairs) > int(top_n),
         'geometry_only': ('本工具只给几何与组合事实：缺失长度/连接点/移码/PAM 朝向/两两脱靶组合。'
