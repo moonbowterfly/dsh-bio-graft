@@ -1,5 +1,11 @@
 # dsh-bio-graft
 
+<div align="center">
+
+[中文](README.md) | **English**
+
+</div>
+
 > Gene-editing design specialty plugin for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 > *(graft = grafting designed sequence changes into an existing genome)*
 
@@ -68,8 +74,15 @@ Every result carries a machine-readable `interpretation_boundary`; zero hits add
 ## Install
 
 ```bash
-dsh plugin add @dsh-bio/dsh-bio-graft --profile web
+dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 ```
+
+(no global CLI: `npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft`)
+
+Nothing else is needed for the 9 semantic tools — they are pure-stdlib Python and reuse the
+`dsh-bio-genie` bootstrapped interpreter (or any `python` on PATH). **Off-target scanning** needs the
+Cas-OFFinder binary, fetched by `graft_backend_status(action="ensure")` (Windows only; place it
+manually elsewhere).
 
 ## Runtime requirements
 

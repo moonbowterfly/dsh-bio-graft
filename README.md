@@ -1,7 +1,14 @@
 # dsh-bio-graft
 
+<div align="center">
+
+**中文** | [English](README.en.md)
+
+</div>
+
 > 基因编辑设计专科插件（dsh-bio-genie 生态的 g 系成员）
 > **Gene-editing design specialty plugin for [dsh](https://github.com/deepseek-ai/deepseek-harness)**
+> `dsh bio crispr` · `dsh 基因编辑设计` · `dsh-bio plugin` · `deepseek harness bioinformatics`
 
 **graft**（嫁接）——把设计好的序列变更「接入」既有基因组。与 `dsh-bio-genie`（许愿式分析宿主）
 和 `dsh-bio-gem`（代谢模型专科）构成 g 系产品家族：
@@ -70,8 +77,14 @@ N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高
 ## 安装（作为 dsh 插件）
 
 ```bash
-dsh plugin add @dsh-bio/dsh-bio-graft --profile web
+dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 ```
+
+（无全局 CLI 时：`npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft`）
+
+安装后 **无需任何额外准备**即可使用 9 个语义化工具（全部纯标准库 Python 实现，复用
+`dsh-bio-genie` 的自举解释器或系统 `python`）；**脱靶扫描**需要 Cas-OFFinder 二进制，
+由 `graft_backend_status(action="ensure")` 自动获取（仅 Windows；其他平台手动放置）。
 
 ## 运行依赖
 
