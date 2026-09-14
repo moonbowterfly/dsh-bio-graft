@@ -1,19 +1,22 @@
 /**
- * dsh-bio-graft — hosted-domain integration protocol v1 (read-only batch).
+ * dsh-bio-graft — hosted-domain integration protocol v2（只读批次）。
  *
- * 协议形状与 dsh-bio-gem（gem-hosted extension）v1 相同，宿主（genie）的
- * classifyGemState() 五态判定消费它：
- *   GET {prefix}/health   — 静态字段（不 spawn Python，不写盘）
- *   GET {prefix}/v1/status — 运行时状态（interpreter / backend / plans / 摘要）
+ * 契约：`dsh-bio-genie/docs/plugin-integration.md` §2.3（health）/ §2.4（status）/ §3（六态）。
+ *   GET {prefix}/health   — 协商端点：身份 + 协议版本 + features。**不 spawn Python、不写盘、不列目录**
+ *   GET {prefix}/v1/status — 运行时快照：state / checks[] / generatedAt / data / env / remediations
  *
- * This module deliberately has no import-time probes: loading the plugin and
- * serving /health must never spawn Python or modify the data directory.
+ * 形状变更史：v0.1 载荷用 `plugin` + `protocol:{major,minors}` + `checks` 对象，
+ * 与契约不符 —— 宿主适配器按固定字段名校验，会把 graft 判成 `installed-unavailable`
+ * （面板谎报「已安装但不可用」）。v0.1.1 起对齐 v2。
+ *
+ * 本模块没有 import 期探测：加载插件与提供 /health 绝不 spawn 进程、不修改数据目录。
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { pythonCandidates } from './python.js'
-import { PLUGIN_VERSION, PLUGIN_ID } from './version.js'
+import { PLUGIN_VERSION } from './version.js'
+import { EDITORS_SUMMARY } from './editors-summary.js'
 
 export const INTEGRATION_PREFIX = '/api/dsh-bio-graft/integration'
 export const PROTOCOL_MAJOR = 1
@@ -23,30 +26,64 @@ export const INTEGRATION_FEATURES = [
   'status',
   'editor-registry',
   'editplans',
-  'cas-offinder',
+  'offtarget-backend',
+  'plan-write',
 ]
 
-/** 短名（历史载荷字段 `plugin` 用短名；完整包名见 PLUGIN_ID）。 */
-const PLUGIN = PLUGIN_ID.split('/').pop()
+const PLUGIN_ID = 'dsh-bio-graft'
 
 function defaultDataRoot() {
   const dshHome = process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
   return join(dshHome, 'dsh-bio-graft')
 }
 
+/** 有限条目列表（契约：列表截断 ≤50，其余只给计数）。 */
 function listFiles(dir, predicate = () => true) {
   try {
-    if (!existsSync(dir)) return []
     return readdirSync(dir, { withFileTypes: true })
-      .filter((e) => e.isFile() && predicate(e.name))
-      .map((e) => ({
-        name: e.name,
-        size: statSync(join(dir, e.name)).size,
-        mtime: statSync(join(dir, e.name)).mtime.toISOString(),
-      }))
+      .filter((entry) => entry.isFile() && predicate(entry.name))
+      .map((entry) => {
+        const stat = statSync(join(dir, entry.name))
+        return { name: entry.name, sizeBytes: stat.size, modifiedAt: stat.mtime.toISOString() }
+      })
+      .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
   } catch {
     return []
   }
+}
+
+function boundedSummary(dir, predicate) {
+  const all = listFiles(dir, predicate)
+  return { count: all.length, items: all.slice(0, 50), dir }
+}
+
+/** cas-offinder 可执行文件探测（与 python/offtarget.py 的候选顺序一致，仅做路径检查）。 */
+function casOffinderProbe(dataRoot) {
+  const envPath = process.env.GRAFT_CAS_OFFINDER
+  if (envPath && existsSync(envPath)) return { present: true, path: envPath, source: 'GRAFT_CAS_OFFINDER' }
+  const local = join(dataRoot, 'bin', 'cas-offinder.exe')
+  if (existsSync(local)) return { present: true, path: local, source: 'graft-bin' }
+  const sibling = join(process.cwd(), 'python', 'cas-offinder.exe')
+  if (existsSync(sibling)) return { present: true, path: sibling, source: 'plugin-python-dir' }
+  return {
+    present: false,
+    path: null,
+    source: null,
+    install_hint: '跑 graft_backend_status(action="ensure") 自动获取 BSD-3 官方二进制（仅 Windows），'
+      + '或手动放置到 ~/.dsh/dsh-bio-graft/bin/',
+  }
+}
+
+/** 解释器候选链（与 src/python.js 同源；只做路径存在性判断，不 spawn）。 */
+function interpreterProbe() {
+  const candidates = pythonCandidates().map((c) => ({
+    path: c.path,
+    source: c.source,
+    exists: c.path === 'python' ? null : existsSync(c.path),
+  }))
+  const hosted = candidates.find((c) => c.exists === true)
+  const selected = hosted ?? candidates.find((c) => c.path === 'python') ?? null
+  return { selected, candidates }
 }
 
 function loopbackOnly(req) {
@@ -55,8 +92,7 @@ function loopbackOnly(req) {
   if (!loopbackIp) return false
   try {
     const host = (req.headers?.host ?? '').split(':')[0]
-    const okHost = ['127.0.0.1', 'localhost', '[::1]'].includes(host)
-    if (!okHost) return false
+    if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) return false
     const site = req.headers?.['sec-fetch-site']
     if (site && site === 'cross-site') return false
     const origin = req.headers?.origin
@@ -71,110 +107,149 @@ function loopbackOnly(req) {
 }
 
 function writeJson(res, status, body) {
-  const text = JSON.stringify(body, null, 2)
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
-  res.end(text)
+  res.end(JSON.stringify(body, null, 2))
 }
 
-/** 静态/半静态 health 载荷。 */
-function healthPayload() {
-  const dshHome = process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
+function statusCheck(id, status, detail) {
+  return { id, status, detail }
+}
+
+/**
+ * 运行时服务（status 有 60s 缓存；health 每次现取但值恒定）。
+ * 返回值一律是**信封**：{ ok: true, value: {...} } —— 与宿主解析器（以及 gem）一致。
+ */
+export function createIntegrationService() {
+  let cached = null
+  let cachedAt = 0
+
   return {
-    plugin: PLUGIN_ID,
-    pluginVersion: PLUGIN_VERSION,
-    protocol: { major: PROTOCOL_MAJOR, minors: PROTOCOL_MINORS },
-    features: INTEGRATION_FEATURES,
-    dataRoot: defaultDataRoot(),
-    checks: {
-      pythonCandidates: pythonCandidates().map((c) => ({ path: c.path, source: c.source })),
-      casOffinderBin: existsSync(join(dshHome, 'dsh-bio-graft', 'bin', 'cas-offinder.exe')),
-      plansDir: existsSync(join(dshHome, 'dsh-bio-graft', 'plans')),
+    async health() {
+      return {
+        ok: true,
+        value: {
+          pluginId: PLUGIN_ID,
+          pluginVersion: PLUGIN_VERSION,
+          protocolMajor: PROTOCOL_MAJOR,
+          protocolMinors: PROTOCOL_MINORS,
+          features: INTEGRATION_FEATURES,
+        },
+      }
+    },
+
+    async status() {
+      if (cached && (Date.now() - cachedAt) < RUNTIME_PROBE_CACHE_MS) return cached
+      const dataRoot = defaultDataRoot()
+      const plansDir = join(dataRoot, 'plans')
+      const plansDirExists = existsSync(plansDir)
+      const dataRootExists = existsSync(dataRoot)
+      const plans = listFiles(plansDir, (n) => n.endsWith('.editplan.json'))
+      const backend = casOffinderProbe(dataRoot)
+      const interp = interpreterProbe()
+
+      const checks = [
+        statusCheck(
+          'python.interpreter',
+          interp.selected && interp.selected.exists === true ? 'ok'
+            : (interp.selected ? 'warn' : 'missing'),
+          interp.selected
+            ? `${interp.selected.path}（source=${interp.selected.source}）`
+            : '未找到可用解释器：设置 GRAFT_PYTHON，或让宿主 dsh-bio-genie 完成自举环境安装',
+        ),
+        statusCheck(
+          'runtime.casoffinder',
+          backend.present ? 'ok' : 'missing',
+          backend.present
+            ? `${backend.path}（source=${backend.source}）`
+            : (backend.install_hint ?? '未安装 cas-offinder'),
+        ),
+        statusCheck(
+          'plans.dir',
+          (plansDirExists || dataRootExists) ? 'ok' : 'warn',
+          plansDirExists
+            ? `${plansDir}（${plans.length} 个计划）`
+            : `尚未创建（首次 graft_plan_save 自动创建）：${plansDir}`,
+        ),
+      ]
+
+      const value = {
+        ok: true,
+        value: {
+          state: checks.every((c) => c.status === 'ok') ? 'ready' : 'degraded',
+          generatedAt: new Date().toISOString(),
+          pluginVersion: PLUGIN_VERSION,
+          features: INTEGRATION_FEATURES,
+          checks,
+          data: {
+            plans: boundedSummary(plansDir, (n) => n.endsWith('.editplan.json')),
+            editors: EDITORS_SUMMARY,
+            backend: { casOffinder: { present: backend.present, path: backend.path ?? null } },
+          },
+          env: {
+            interpreter: interp.selected
+              ? { selected: interp.selected.path, source: interp.selected.source,
+                  candidates: interp.candidates }
+              : { selected: null, candidates: interp.candidates },
+          },
+          remediations: checks
+            .filter((c) => c.status !== 'ok')
+            .map((c) => ({
+              code: c.id === 'runtime.casoffinder'
+                ? 'graft.ensure-offtarget-backend'
+                : c.id === 'python.interpreter'
+                  ? 'graft.set-python-interpreter'
+                  : 'graft.inspect-runtime',
+              owner: 'graft',
+              detail: `${c.id}: ${c.detail}`,
+            })),
+        },
+      }
+      cached = value
+      cachedAt = Date.now()
+      return value
+    },
+
+    invalidate() {
+      cached = null
+      cachedAt = 0
     },
   }
 }
 
-/**
- * 运行时 status（昂贵探测，60s 缓存）。
- * 返回 state ∈ {ready, degraded} + pending 缺项摘要。
- */
-export function createIntegrationService() {
-  let cachedStatus = null
-  let cachedAt = 0
-
-  async function status() {
-    if (cachedStatus && (Date.now() - cachedAt) < RUNTIME_PROBE_CACHE_MS) return cachedStatus
-    const dataRoot = defaultDataRoot()
-    const plansDir = join(dataRoot, 'plans')
-    const binDir = join(dataRoot, 'bin')
-    const casExe = join(binDir, 'cas-offinder.exe')
-
-    const checks = {}
-    checks.plansDir = { status: existsSync(plansDir) ? 'ok' : 'missing' }
-    checks.casOffinder = { status: existsSync(casExe) ? 'ok' : 'missing',
-                           install_hint: existsSync(casExe) ? undefined
-                             : 'graft_backend_status action=ensure 自动安装 BSD-3 二进制' }
-    // python 解释器探测（不 spawn，读 pythonCandidates；真正 import 探测由 graft op 做）
-    const py = pythonCandidates()
-    checks.interpreter = {
-      status: py.length ? 'ok' : 'missing',
-      selected: py[0]?.path ?? null,
-      candidates: py.map((c) => ({ path: c.path, source: c.source })),
-    }
-
-    const plans = listFiles(plansDir, (n) => n.endsWith('.editplan.json'))
-    const nonOk = Object.entries(checks).filter(([, v]) => v?.status !== 'ok')
-    const state = nonOk.length === 0 ? 'ready' : 'degraded'
-    const value = {
-      plugin: PLUGIN,
-      pluginVersion: PLUGIN_VERSION,
-      state,
-      checks,
-      data: {
-        plans: { count: plans.length, entries: plans.slice(0, 50) },
-        casOffinder: { present: existsSync(casExe) },
-      },
-      env: {
-        interpreter: py.length ? { selected: py[0].path, source: py[0].source } : null,
-      },
-      remediations: nonOk.length > 0
-        ? nonOk.map(([k]) => ({ code: `graft.remediate-${k}`, owner: 'graft' }))
-        : [],
-      protocol: { major: PROTOCOL_MAJOR, minors: PROTOCOL_MINORS },
-    }
-    cachedStatus = value
-    cachedAt = Date.now()
-    return value
-  }
-
-  return { status, invalidate: () => { cachedStatus = null; cachedAt = 0 } }
-}
-
-/** 注册 integration 路由（loopback-only 守卫 + 20s 硬超时）。 */
+/** 注册 integration 路由（loopback-only 守卫 + status 20s 硬超时）。 */
 export function registerIntegrationRoutes(ctx, { service }) {
   const HARD_TIMEOUT_MS = 20_000
-  ctx.webServer.register({
+  const disposers = []
+
+  const respond = async (res, producer) => {
+    try {
+      writeJson(res, 200, await producer())
+    } catch (error) {
+      // 契约：任何未预期异常也要返回 JSON 信封（前端永远拿到 JSON）
+      writeJson(res, 200, { ok: false, code: 'internal', message: String(error?.message ?? error) })
+    }
+  }
+
+  disposers.push(ctx.webServer.register({
     kind: 'exact',
     path: `${INTEGRATION_PREFIX}/health`,
     handler: (req, res) => {
       if (!loopbackOnly(req)) return writeJson(res, 403, { ok: false, code: 'loopback-required' })
-      writeJson(res, 200, { ok: true, value: healthPayload() })
+      return respond(res, () => service.health())
     },
-  })
-  ctx.webServer.register({
+  }))
+
+  disposers.push(ctx.webServer.register({
     kind: 'exact',
     path: `${INTEGRATION_PREFIX}/v1/status`,
-    handler: async (req, res) => {
+    handler: (req, res) => {
       if (!loopbackOnly(req)) return writeJson(res, 403, { ok: false, code: 'loopback-required' })
-      try {
-        const value = await Promise.race([
-          service.status(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), HARD_TIMEOUT_MS)),
-        ])
-        writeJson(res, 200, { ok: true, value })
-      } catch (error) {
-        writeJson(res, 200, { ok: false, code: 'internal', message: String(error?.message ?? error) })
-      }
+      return respond(res, () => Promise.race([
+        service.status(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), HARD_TIMEOUT_MS)),
+      ]))
     },
-  })
-  return () => {}
+  }))
+
+  return () => disposers.forEach((d) => d?.())
 }

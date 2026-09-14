@@ -1,0 +1,83 @@
+{
+  "schema": "dsh-bio/capabilities@1",
+  "pluginId": "dsh-bio-graft",
+  "packageName": "@dsh-bio/dsh-bio-graft",
+  "domain": "gene-editing",
+  "displayName": {
+    "zh": "基因编辑设计",
+    "en": "Gene-editing design"
+  },
+  "toolPrefix": "graft_",
+  "tools": [
+    "graft_profiles",
+    "graft_design",
+    "graft_score",
+    "graft_offtarget",
+    "graft_backend_status",
+    "graft_plan_save",
+    "graft_plan_load"
+  ],
+  "skill": {
+    "name": "graft-expert",
+    "provider": "dsh-bio-graft"
+  },
+  "triggerWords": {
+    "zh": ["sgRNA", "guide 设计", "敲除", "敲入", "编辑位点", "碱基编辑", "脱靶", "PAM", "编辑验证", "编辑计划", "切割位点"],
+    "en": ["sgRNA", "guide design", "knockout", "knock-in", "base editing", "off-target", "EditPlan", "cut site"]
+  },
+  "integration": {
+    "protocolMajor": 1,
+    "protocolMinors": [0],
+    "healthPath": "/api/dsh-bio-graft/integration/health",
+    "statusPath": "/api/dsh-bio-graft/integration/v1/status",
+    "features": ["status", "editor-registry", "editplans", "offtarget-backend", "plan-write"],
+    "requiredCheckIds": ["python.interpreter", "runtime.casoffinder", "plans.dir"]
+  },
+  "assets": [
+    {
+      "kind": "edit-plan",
+      "path": "~/.dsh/dsh-bio-graft/plans/<name>.editplan.json",
+      "schemaVersion": "0.2",
+      "appendOnly": "~/.dsh/dsh-bio-graft/plans/<name>/runs/",
+      "authority": "编辑设计结论（推荐候选/排序理由/脱靶摘要）的唯一权威源"
+    }
+  ],
+  "overlapRules": [
+    {
+      "rival": "bio_crispr_guide",
+      "precedence": "self",
+      "reason": "深水区编辑设计（多候选枚举/切点几何/全基因组脱靶/EditPlan 账本/碱基编辑）归 graft；宿主工具是轻量兜底层（模板内扫描 + 简化启发式效率分，非验证模型）"
+    },
+    {
+      "rival": "bio_ref_genome",
+      "precedence": "rival",
+      "reason": "参考基因组获取/assembly 信息属宿主通用能力（graft 只做基因组体检与脱靶扫描，不实现下载）"
+    },
+    {
+      "rival": "bio_primer_design",
+      "precedence": "rival",
+      "reason": "验证引物设计属宿主通用序列能力；graft 只规划验证方案并交接"
+    }
+  ],
+  "requires": {
+    "python": ">=3.10",
+    "externalBinaries": [
+      {
+        "id": "cas-offinder",
+        "version": "2.4.1",
+        "license": "BSD-3-Clause",
+        "bundled": false,
+        "obtain": "graft_backend_status(action=\"ensure\")，或手动放置到 ~/.dsh/dsh-bio-graft/bin/",
+        "note": "需要 OpenCL 设备；本机实测无 CPU OpenCL 设备时须用 GPU（device=auto 自动选择）"
+      }
+    ]
+  },
+  "safetyBoundary": {
+    "levels": ["0-routine-research", "1-human-somatic", "2-clinical-decision", "3-heritable-or-pathogen-enhancement"],
+    "hardRules": [
+      "脱靶计算不得给出「安全」「无脱靶」结论，只能说「在当前搜索参数下未检出」",
+      "不打综合分：只给评分向量 + 声明式 objective；rank 理由落 EditPlan 账本",
+      "几何未对一手文献核对（verified=false）的编辑器必须如实标注，不得当既定事实"
+    ]
+  }
+}
