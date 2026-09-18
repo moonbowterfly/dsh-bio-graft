@@ -132,6 +132,19 @@ check('base_edit strategy points to the dedicated tool instead of faking geometr
   elsewhere.implementation_state === 'elsewhere' && /graft_base_edit/.test(String(elsewhere.note)),
   JSON.stringify(elsewhere.implementation_state))
 
+let singleCut = null
+let singleCutError = ''
+try {
+  singleCut = op('evaluate_strategy', { candidates: [g1], strategy: 'single_cut' })
+} catch (e) {
+  singleCutError = e.message
+}
+check('single_cut accepts one candidate and delegates to the design tools',
+  singleCut?.implemented === true &&
+  singleCut?.verdict === 'use_design_tools' &&
+  singleCut?.n_candidates === 1,
+  singleCutError || JSON.stringify(singleCut))
+
 // ── ⑥ 输入卫生 ────────────────────────────────────────────────────────────
 let badStrategy = ''
 try { op('evaluate_strategy', { ...CG, strategy: 'magic' }) } catch (e) { badStrategy = e.message }

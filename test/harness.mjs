@@ -34,7 +34,7 @@ export function skip(name, reason) {
     check(name, false, `(skipped: ${reason}; GRAFT_STRICT=1 forbids silent skips)`)
     return false
   }
-  console.log(`  skip ${name} (${reason})`)
+  console.log(`  SKIP-NOT-VALIDATED ${name} (${reason})`)
   return true
 }
 
@@ -73,18 +73,17 @@ export function pythonExe() {
   throw new Error('no usable python interpreter (set GRAFT_PYTHON to override)')
 }
 
-/** 直驱 graft_ops.py：{op, args} -> result；代码级失败（traceback / ok:false）抛错。 */
-export function op(opName, args = {}, { timeoutMs = 120_000 } = {}) {
-  const py = pythonExe()
-  const res = spawnSync(py, ['-I', join(PYDIR, 'graft_ops.py')], {
-    cwd: PYDIR,
-    input: JSON.stringify({ op: opName, args }),
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    windowsHide: true,
-    maxBuffer: 64 * 1024 * 1024,
-  })
+/** 解析 graft_ops.py 子进程结果；独立导出，供异常退出契约做合成回归。 */
+export function parseOpResult(opName, res) {
   const err = res.stderr || ''
+  if (res.error) {
+    throw new Error(`op ${opName} spawn failed: ${res.error.message ?? res.error}`)
+  }
+  if (res.signal) {
+    throw new Error(
+      `op ${opName} child exited abnormally (status=${res.status}, signal=${res.signal ?? 'none'}); ` +
+      'stdout is not trusted even when it contains valid JSON')
+  }
   if (err.includes('Traceback (most recent call last)')) {
     throw new Error(`op ${opName} traceback: ${err.slice(-600)}`)
   }
@@ -96,6 +95,25 @@ export function op(opName, args = {}, { timeoutMs = 120_000 } = {}) {
   } catch (e) {
     throw new Error(`op ${opName} returned non-JSON: ${line.slice(0, 200)}`)
   }
+  if (res.status !== 0) {
+    throw new Error(
+      `op ${opName} child exited abnormally (status=${res.status}, signal=none); ` +
+      'stdout is not trusted even when it contains valid JSON')
+  }
   if (parsed.ok !== true) throw new Error(`op ${opName} ok:false -> ${parsed.error}`)
   return parsed.result
+}
+
+/** 直驱 graft_ops.py：{op, args} -> result；代码级失败（traceback / ok:false）抛错。 */
+export function op(opName, args = {}, { timeoutMs = 120_000 } = {}) {
+  const py = pythonExe()
+  const res = spawnSync(py, ['-I', join(PYDIR, 'graft_ops.py')], {
+    cwd: PYDIR,
+    input: JSON.stringify({ op: opName, args }),
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    windowsHide: true,
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  return parseOpResult(opName, res)
 }

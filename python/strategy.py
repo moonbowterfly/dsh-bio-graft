@@ -152,12 +152,14 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
                        '如需，请按节点说明改走已实现路径或外部工具。',
             'available_strategies': sorted(STRATEGIES),
         }
-    if not isinstance(candidates, list) or len(candidates) < 2:
-        raise ValueError('candidates 至少两条（策略评估需要组合）')
+    if not isinstance(candidates, list) or not candidates:
+        raise ValueError('candidates 至少一条')
 
     if strategy == 'single_cut':
         return {'strategy': strategy, 'implemented': True, 'verdict': 'use_design_tools',
                 'note': meta['note'], 'n_candidates': len(candidates)}
+    if len(candidates) < 2:
+        raise ValueError('candidates 至少两条（策略评估需要组合）')
 
     pairs = []
     for i in range(len(candidates)):

@@ -1,0 +1,23 @@
+{
+  "schema": "dsh-bio-graft/rank-contract@1",
+  "metrics": [
+    "template_hits",
+    "gc_content",
+    "gc_abs_dev",
+    "max_self_palindrome",
+    "homopolymer_max",
+    "cut_site_0",
+    "offtarget_total",
+    "offtarget_mm0",
+    "offtarget_mm1",
+    "offtarget_mm2",
+    "offtarget_mm3"
+  ],
+  "hardFilterDirections": ["min", "max"],
+  "canonicalGcFilters": ["gc_content_min", "gc_content_max"],
+  "hardFilterExample": {
+    "template_hits_max": 1,
+    "gc_content_min": 0.35,
+    "gc_content_max": 0.7
+  }
+}

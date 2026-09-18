@@ -20,6 +20,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
+
+_RANK_CONTRACT_PATH = Path(__file__).resolve().parent.parent / 'rank-contract.json'
+with _RANK_CONTRACT_PATH.open(encoding='utf-8') as _contract_file:
+    RANK_CONTRACT = json.load(_contract_file)
 
 # ── 度量注册表：name -> (extractor, direction) ────────────────────────────────
 # direction: 'min' 表示越小越好；'max' 表示越大越好。extractor 返回 None = 该数据未做过。
@@ -52,10 +57,17 @@ def _gc(c: dict):
 
 
 def _homopolymer_max(c: dict):
-    runs = _scores(c).get('homopolymer_runs')
-    if runs is None:
+    if not isinstance(c, dict):
         return None
-    return max((len(r) for r in runs), default=0)
+    # 兼容 agent 合并结果的三种形态，优先级即数据权威顺序：
+    # ① guide_score 的嵌套列表；② 顶层列表；③ 顶层已汇总最大值。
+    for runs in (_scores(c).get('homopolymer_runs'), c.get('homopolymer_runs')):
+        if isinstance(runs, list):
+            return max((len(r) for r in runs if isinstance(r, str)), default=0)
+    value = c.get('homopolymer_max')
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return None
 
 
 def _offtarget_mm(c: dict, k: int):
@@ -80,7 +92,10 @@ def _offtarget_mm(c: dict, k: int):
 
 
 def _valid_filter_names() -> list[str]:
-    return sorted([f'{m}_{d}' for m in METRICS for d in ('min', 'max')] + ['exclude_warnings'])
+    return sorted(
+        [f'{m}_{d}' for m in RANK_CONTRACT['metrics']
+         for d in RANK_CONTRACT['hardFilterDirections']]
+        + ['exclude_warnings'])
 
 
 METRICS = {
@@ -97,6 +112,11 @@ METRICS = {
     'offtarget_mm2': (lambda c: _offtarget_mm(c, 2), 'min'),
     'offtarget_mm3': (lambda c: _offtarget_mm(c, 3), 'min'),
 }
+
+if set(METRICS) != set(RANK_CONTRACT['metrics']):
+    raise RuntimeError(
+        'rank-contract.json metrics 与 Python extractor 漂移：'
+        f'contract={sorted(RANK_CONTRACT["metrics"])} python={sorted(METRICS)}')
 
 RANK_SEMANTICS = (
     '秩是 **policy-dependent** 的序数表达：同一组候选在不同策略下可以有不同的名次，'
@@ -162,6 +182,28 @@ def _filter_candidate(c: dict, hard_filters: dict | None) -> list[str]:
     return reasons
 
 
+def _exclude_missing_metrics(candidates: list[dict], keys: list[str],
+                             excluded: list[dict], policy: str) -> list[dict]:
+    """目标轴缺失即 fail-closed；未知数据不能靠零成本或部分可比进入排名。"""
+    eligible: list[dict] = []
+    unique_keys = list(dict.fromkeys(keys))
+    for c in candidates:
+        missing = [key for key in unique_keys if METRICS[key][0](c) is None]
+        if not missing:
+            eligible.append(c)
+            continue
+        label = c.get('protospacer') or c.get('guide') or '(unnamed)'
+        excluded.append({
+            'protospacer': label,
+            'reasons': [
+                f'{key}=not_searched/missing data —— 无法参与 {policy} 排名'
+                f'（负证据语义：缺失 ≠ 通过）'
+                for key in missing
+            ],
+        })
+    return eligible
+
+
 def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None = None,
                     objectives: list | None = None, weights: dict | None = None,
                     hard_filters: dict | None = None, top_n: int | None = None) -> dict:
@@ -194,13 +236,14 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
             raise ValueError('lexicographic 需要 order=[...]（如 ["template_hits:min", ...]）')
         parsed = [_parse_spec(s) for s in specs]
         keys = [p[0] for p in parsed]
+        eligible = _exclude_missing_metrics(ranked_input, keys, excluded, 'lexicographic')
 
         def sort_key(c: dict):
             # 缺失值排最后（避免"没做过的分析"被当成最优）
             return tuple((1, 0) if METRICS[k][0](c) is None else (0, METRICS[k][0](c) * d)
                          for k, d in [(k, 1 if dd == 'min' else -1) for k, dd in parsed])
 
-        ordered = sorted(ranked_input, key=sort_key)
+        ordered = sorted(eligible, key=sort_key)
         for i, c in enumerate(ordered, 1):
             entries.append({'rank': i, 'protospacer': c.get('protospacer'), 'vector_values': vector(c, keys)})
         policy_payload = {'policy': 'lexicographic', 'order': specs, 'hard_filters': hard_filters or {}}
@@ -209,13 +252,14 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
         specs = objectives or (order or ['template_hits:min', 'max_self_palindrome:min', 'gc_abs_dev:min'])
         parsed = [_parse_spec(s) for s in specs]
         keys = [p[0] for p in parsed]
+        eligible = _exclude_missing_metrics(ranked_input, keys, excluded, 'pareto')
 
         def dominates(a: dict, b: dict) -> bool:
             better = False
             for (k, d) in parsed:
                 va, vb = METRICS[k][0](a), METRICS[k][0](b)
                 if va is None or vb is None:
-                    continue  # 该轴不可比（未做过该分析）——不据此宣称支配
+                    return False  # 防御性兜底：任一轴不可比就不得宣称支配
                 if d == 'min':
                     if va > vb:
                         return False
@@ -229,13 +273,13 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
             return better
 
         dom_map = {}
-        for c in ranked_input:
-            doms = [o.get('protospacer') for o in ranked_input if o is not c and dominates(o, c)]
+        for c in eligible:
+            doms = [o.get('protospacer') for o in eligible if o is not c and dominates(o, c)]
             dom_map[c.get('protospacer')] = doms
-        front = [c.get('protospacer') for c in ranked_input if not dom_map.get(c.get('protospacer'))]
+        front = [c.get('protospacer') for c in eligible if not dom_map.get(c.get('protospacer'))]
         pareto_front = front
         # 排序：先前沿，再按支配者数量少→多
-        ordered = sorted(ranked_input,
+        ordered = sorted(eligible,
                          key=lambda c: (0 if c.get('protospacer') in front else 1,
                                         len(dom_map.get(c.get('protospacer')) or [])))
         for i, c in enumerate(ordered, 1):
@@ -255,6 +299,7 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
             if k not in METRICS:
                 raise ValueError(f'unknown metric {k!r} in weights；可用：{sorted(METRICS)}')
         keys = sorted(weights)
+        eligible = _exclude_missing_metrics(ranked_input, keys, excluded, 'weighted')
 
         def wvalue(c: dict):
             total, missing = 0.0, []
@@ -266,7 +311,7 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
                 total += float(w) * float(v)
             return round(total, 6), missing
 
-        enriched = [(c, *wvalue(c)) for c in ranked_input]
+        enriched = [(c, *wvalue(c)) for c in eligible]
         enriched.sort(key=lambda t: t[1])
         for i, (c, val, missing) in enumerate(enriched, 1):
             entry = {'rank': i, 'protospacer': c.get('protospacer'),

@@ -93,10 +93,15 @@ def design_base_edit(sequence: str, editor: str = 'BE3', *,
     lo, hi = profile.core_window if profile.core_window else (None, None)
     if lo is None:
         raise ValueError(f'{profile.name} 未声明核心窗口（未经一手文献核对）——拒绝设计')
+    if strand not in ('both', '+', '-'):
+        raise ValueError(f'strand 必须是 both / + / -，收到 {strand!r}')
 
     scan = enumerate_guides(seq, editor=profile.nuclease, top_n=10 ** 6,
-                            scan_both_strands=(strand == 'both'))
-    candidates = scan.get('candidates') or []
+                            # '-' 需要枚举反链；enumerate_guides 的 false 语义是只扫正链。
+                            scan_both_strands=(strand in ('both', '-')))
+    scanned = scan.get('candidates') or []
+    candidates = (scanned if strand == 'both'
+                  else [c for c in scanned if c.get('strand', '+') == strand])
     win_lo, win_hi = (profile.broader_observed_window if include_broader_window
                       else profile.core_window)
 
@@ -107,8 +112,6 @@ def design_base_edit(sequence: str, editor: str = 'BE3', *,
         if len(P) != profile.spacer_length:
             continue
         g_strand = c.get('strand', '+')
-        if strand != 'both' and g_strand != strand:
-            continue
         editable = []
         for pos in range(win_lo, min(win_hi, len(P)) + 1):
             base = P[pos - 1]
@@ -187,6 +190,7 @@ def design_base_edit(sequence: str, editor: str = 'BE3', *,
         'sequence_context': {'record_id': record_id, 'n_records': n_records,
                              'length_bp': len(seq)},
         'nuclease': nuclease.name,
+        'strand_requested': strand,
         'window_used': {'start_1': win_lo, 'end_1': win_hi,
                         'counting': profile.window_counting,
                         'broader_window_included': bool(include_broader_window)},

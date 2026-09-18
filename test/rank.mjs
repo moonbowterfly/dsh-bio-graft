@@ -5,7 +5,12 @@
 //   · 秩是 policy-dependent：返回体必须带 policy_id + policy_digest + policy_echo
 //   · **禁止默认隐形权重**；weighted 必须带 disclaimer，且给的是 declared_objective_value（非 "score"）
 //   · 负证据语义：过滤器依赖的数据缺失时必须**排除并说明 not_searched/missing**，绝不静默通过
-import { check, summary, op } from './harness.mjs'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { check, summary, op, REPO } from './harness.mjs'
+
+const RANK_CONTRACT = JSON.parse(readFileSync(join(REPO, 'rank-contract.json'), 'utf8'))
+const [GC_CONTENT_MIN, GC_CONTENT_MAX] = RANK_CONTRACT.canonicalGcFilters
 
 // 夹具：4 条候选（字段取自 graft_design + graft_score 的真实形态）
 const cand = (spacer, hits, gc, pal, offtotal) => ({
@@ -50,7 +55,9 @@ check('lexicographic: vector values travel with the rank',
   lex.ranked[0].vector_values.gc_abs_dev === 0,
   JSON.stringify(lex.ranked[0].vector_values))
 check('lexicographic: no opaque score field anywhere',
-  !JSON.stringify(lex).includes('"score"') || !JSON.stringify(lex).includes('quality_score'))
+  !JSON.stringify(lex).includes('"score"'))
+check('lexicographic: no opaque quality_score field anywhere',
+  !JSON.stringify(lex).includes('quality_score'))
 
 // ---------- ② Pareto ----------
 const pareto = op('rank_candidates', {
@@ -87,6 +94,33 @@ check('weighted: disclaimer present and forbids report-grade use',
   String(weighted.disclaimer).slice(0, 80))
 check('weighted: weights are echoed in the policy payload',
   JSON.stringify(weighted.policy.weights) === JSON.stringify({ gc_abs_dev: 1, max_self_palindrome: 0.1 }))
+
+// ---------- ③b 排名目标缺失必须 fail-closed ----------
+const MISSING = { protospacer: 'M'.repeat(20), template_hits: 0 }
+const COMPLETE = cand('N'.repeat(20), 1, 0.50, 10, 1)
+const weightedMissing = op('rank_candidates', {
+  candidates: [MISSING, COMPLETE],
+  policy: 'weighted',
+  weights: { gc_abs_dev: 1, max_self_palindrome: 1 },
+})
+check('weighted: missing objective metrics are excluded instead of receiving zero cost',
+  weightedMissing.n_ranked === 1 &&
+  weightedMissing.ranked[0]?.protospacer === COMPLETE.protospacer &&
+  weightedMissing.excluded.some((e) => e.protospacer === MISSING.protospacer &&
+    e.reasons.some((r) => /not_searched|missing/i.test(r))),
+  JSON.stringify(weightedMissing))
+
+const paretoMissing = op('rank_candidates', {
+  candidates: [MISSING, COMPLETE],
+  policy: 'pareto',
+  objectives: ['template_hits:min', 'max_self_palindrome:min', 'gc_abs_dev:min'],
+})
+check('pareto: candidates missing any objective axis are excluded and cannot dominate',
+  paretoMissing.n_ranked === 1 &&
+  paretoMissing.pareto_front.length === 1 &&
+  paretoMissing.pareto_front[0] === COMPLETE.protospacer &&
+  paretoMissing.excluded.some((e) => e.protospacer === MISSING.protospacer),
+  JSON.stringify(paretoMissing))
 
 // ---------- ④ 负证据语义：依赖缺失的数据不得静默通过 ----------
 // 造两条**从未做过脱靶分析**的候选（无 offtarget_summary 字段）
@@ -138,13 +172,61 @@ check('flat offtarget_summary shape is understood (not treated as not_searched)'
   flatRanked.ranked[0].vector_values.offtarget_mm0 === 1,
   JSON.stringify({ n: flatRanked.n_ranked, excl: flatRanked.excluded }))
 
-// ---------- ⑦ 未知 filter 名必须列出可用名（agent 自纠错的最小信息量）----------
+// ---------- ⑦ homopolymer 的三层回退：nested → flat runs → flat max ----------
+const flatHomoTooLong = {
+  protospacer: 'H'.repeat(20), template_hits: 1, gc_content: 0.5,
+  max_self_palindrome: 4, homopolymer_max: 5,
+}
+const flatHomoFiltered = op('rank_candidates', {
+  candidates: [flatHomoTooLong],
+  policy: 'lexicographic',
+  order: ['homopolymer_max:min'],
+  hard_filters: { homopolymer_max_max: 4 },
+})
+check('flat homopolymer_max participates in hard filters',
+  flatHomoFiltered.n_ranked === 0 && flatHomoFiltered.n_excluded === 1 &&
+  flatHomoFiltered.excluded[0].reasons.some((r) => /homopolymer_max=5/.test(r)),
+  JSON.stringify(flatHomoFiltered))
+
+const flatRuns = {
+  protospacer: 'I'.repeat(20), template_hits: 1, gc_content: 0.5,
+  max_self_palindrome: 4, homopolymer_runs: ['AAAAA'],
+}
+const flatMax = {
+  protospacer: 'J'.repeat(20), template_hits: 1, gc_content: 0.5,
+  max_self_palindrome: 4, homopolymer_max: 3,
+}
+const flatHomoSorted = op('rank_candidates', {
+  candidates: [flatRuns, flatMax],
+  policy: 'lexicographic',
+  order: ['homopolymer_max:min'],
+})
+check('flat homopolymer runs/max participate in sorting with the declared precedence',
+  flatHomoSorted.ranked.map((x) => x.protospacer).join(',') ===
+    [flatMax.protospacer, flatRuns.protospacer].join(',') &&
+  flatHomoSorted.ranked[0].vector_values.homopolymer_max === 3 &&
+  flatHomoSorted.ranked[1].vector_values.homopolymer_max === 5,
+  JSON.stringify(flatHomoSorted.ranked))
+
+// ---------- ⑧ GC filter 契约由 rank-contract.json 定义 ----------
+const canonicalGc = op('rank_candidates', {
+  candidates: [A],
+  policy: 'lexicographic',
+  order: ['template_hits:min'],
+  hard_filters: { [GC_CONTENT_MIN]: 0.3, [GC_CONTENT_MAX]: 0.7 },
+})
+check('canonical gc_content_min/max filters are accepted',
+  canonicalGc.n_ranked === 1 && canonicalGc.n_excluded === 0,
+  JSON.stringify(canonicalGc))
+
+// 旧别名必须响亮失败，并列出契约中的规范名。
 let errText = ''
 try {
   op('rank_candidates', { candidates: [A], policy: 'lexicographic', order: ['template_hits:min'], hard_filters: { gc_min: 0.3 } })
 } catch (e) { errText = e.message }
 check('unknown filter name lists the valid names',
-  /gc_min/.test(errText) && /gc_content_min/.test(errText) && /可用/.test(errText),
+  /gc_min/.test(errText) && errText.includes(GC_CONTENT_MIN) &&
+  errText.includes(GC_CONTENT_MAX) && /可用/.test(errText),
   errText.slice(0, 160))
 
 summary('rank')

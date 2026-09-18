@@ -23,6 +23,7 @@
   "files": [
     "index.js",
     "src/**/*.js",
+    "rank-contract.json",
     "cordis.patch.yml",
     "capabilities.json",
     "python/**/*.py",

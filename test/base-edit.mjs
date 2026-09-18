@@ -94,6 +94,33 @@ if (myMinus) {
     `pos=${e.genome_pos_0based} base=${SEQ_MINUS[e.genome_pos_0based]}`)
 }
 
+// ③a strand 参数必须决定实际候选集合；both 是 + 与 - 的并集上界。
+const cbePlusOnly = op('base_edit_design', {
+  sequence: SEQ_MINUS, editor: 'BE3', strand: '+', top_n: 50,
+})
+const cbeMinusOnly = op('base_edit_design', {
+  sequence: SEQ_MINUS, editor: 'BE3', strand: '-', top_n: 50,
+})
+const candidateKey = (c) =>
+  [c.protospacer, c.pam, c.start_0, c.end_0, c.guide_strand].join('|')
+const bothKeys = new Set((cbeMinus.candidates ?? []).map(candidateKey))
+const unionKeys = new Set([
+  ...(cbePlusOnly.candidates ?? []).map(candidateKey),
+  ...(cbeMinusOnly.candidates ?? []).map(candidateKey),
+])
+check('strand="+": returns only plus-strand candidates',
+  (cbePlusOnly.candidates ?? []).every((c) => c.guide_strand === '+'),
+  JSON.stringify(cbePlusOnly.candidates?.map((c) => c.guide_strand)))
+check('strand="-": actually scans the reverse strand and is non-empty',
+  (cbeMinusOnly.candidates ?? []).length > 0 &&
+  (cbeMinusOnly.candidates ?? []).every((c) => c.guide_strand === '-'),
+  JSON.stringify({ scanned: cbeMinusOnly.n_candidates_scanned,
+    returned: cbeMinusOnly.n_returned,
+    strands: cbeMinusOnly.candidates?.map((c) => c.guide_strand) }))
+check('strand="both": candidate set contains the union of + and -',
+  [...unionKeys].every((key) => bothKeys.has(key)),
+  JSON.stringify({ both: [...bothKeys], union: [...unionKeys] }))
+
 // ③b 反链候选 + 声明的 + 链 CDS：密码子后果必须用**参考正链碱基**算
 const cbeMinusCds = op('base_edit_design', {
   sequence: SEQ_MINUS, editor: 'BE3', cds_start_0: 0, cds_strand: '+', top_n: 50,

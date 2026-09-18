@@ -8,7 +8,7 @@
 import './register-dsh-tools.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { check, summary, REPO } from './harness.mjs'
+import { check, summary, REPO, parseOpResult } from './harness.mjs'
 
 const toolsMod = await import('../src/tools.js')
 
@@ -54,6 +54,7 @@ const opsEnd = opsSource.indexOf('def main()')
 const opsBlock = opsSource.slice(opsStart, opsEnd)
 
 const toolsSource = readFileSync(join(REPO, 'src', 'tools.js'), 'utf8')
+const rankContract = JSON.parse(readFileSync(join(REPO, 'rank-contract.json'), 'utf8'))
 const referenced = new Set()
 for (const m of toolsSource.matchAll(/op:\s*'([a-z_]+)'/g)) referenced.add(m[1])
 for (const m of toolsSource.matchAll(/callGraft\('([a-z_]+)'/g)) referenced.add(m[1])
@@ -65,6 +66,28 @@ check('src/tools.js references at least one op per tool',
 for (const opName of [...referenced].sort()) {
   check(`op "${opName}" exists in graft_ops OPS`, opsBlock.includes(`'${opName}'`))
 }
+
+// ---------- 子进程边界必须 fail-closed ----------
+let abnormalExitRejected = false
+try {
+  parseOpResult('synthetic_success_then_exit_3', {
+    status: 3,
+    signal: null,
+    stdout: '{"ok":true,"result":{"looks":"valid"}}\n',
+    stderr: '',
+  })
+} catch (e) {
+  abnormalExitRejected = /abnormal|exit|code|status/i.test(String(e.message))
+}
+check('harness rejects valid JSON produced by a non-zero child exit', abnormalExitRejected)
+
+// ---------- rank hard-filter 名称只有一份契约 ----------
+const rankTool = registered.find((t) => t.name === 'graft_rank')
+const rankHelp = `${rankTool?.description ?? ''} ${rankTool?.parameters?.hard_filters?.description ?? ''}`
+check('graft_rank help uses canonical GC filter names from rank-contract.json',
+  rankContract.canonicalGcFilters.every((name) => rankHelp.includes(name)) &&
+  !/(^|[^_])gc_min\b|(^|[^_])gc_max\b/.test(rankHelp),
+  rankHelp.slice(0, 500))
 
 // ---------- 分支型工具必须真的走到自己的 execute ----------
 // 回归背景（2026-09-14 真实会话）：工具工厂无条件覆盖 execute，导致 graft_backend_status

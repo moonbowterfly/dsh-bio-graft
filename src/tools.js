@@ -11,7 +11,13 @@
 //   graft_plan_save       — EditPlan 保存/追加 run（append-only 账本）
 //   graft_plan_load       — EditPlan 读回（plan + 全部 runs 时间线）
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { readFileSync } from 'node:fs'
 import { callGraft } from './python.js'
+
+const RANK_CONTRACT = JSON.parse(
+  readFileSync(new URL('../rank-contract.json', import.meta.url), 'utf8'))
+const GC_FILTER_NAMES = RANK_CONTRACT.canonicalGcFilters.join(' / ')
+const HARD_FILTER_EXAMPLE = JSON.stringify(RANK_CONTRACT.hardFilterExample)
 
 /** graft_ops 通用工具工厂（graft op 全部直接透传 JSON）。
  *
@@ -206,7 +212,7 @@ export function registerTools(ctx) {
       'dominated_by）、lexicographic（字典序，order=["template_hits:min","max_self_palindrome:min",' +
       '"gc_abs_dev:min"] 声明哪个 criterion 更重要）、weighted（**必须显式给 weights**，' +
       '否则报错；返回 declared_objective_value = 按声明权重的线性组合并附 disclaimer）。' +
-      'hard_filters 支持硬约束（template_hits_max / gc_min|gc_max / max_self_palindrome_max / ' +
+      `hard_filters 支持硬约束（template_hits_max / ${GC_FILTER_NAMES} / max_self_palindrome_max / ` +
       'homopolymer_max_max / offtarget_total_max / offtarget_mm0_max… / exclude_warnings），' +
       '被剔除的候选带 reasons；**依赖的数据缺失时按 not_searched 处理并剔除说明——绝不静默通过**。' +
       '可用度量：template_hits / gc_content / gc_abs_dev / max_self_palindrome / homopolymer_max / ' +
@@ -218,7 +224,7 @@ export function registerTools(ctx) {
       order: { type: 'array', items: { type: 'string' }, description: 'lexicographic 的度量序列，如 ["template_hits:min","gc_abs_dev:min"]' },
       objectives: { type: 'array', items: { type: 'string' }, description: 'pareto 的目标序列（默认 template_hits:min / max_self_palindrome:min / gc_abs_dev:min）' },
       weights: { type: 'object', additionalProperties: true, description: 'weighted 的显式权重 {metric: weight}（原始单位，不做默认加权）' },
-      hard_filters: { type: 'object', additionalProperties: true, description: '硬约束，如 {template_hits_max:1, gc_min:0.35, gc_max:0.7}' },
+      hard_filters: { type: 'object', additionalProperties: true, description: `硬约束，如 ${HARD_FILTER_EXAMPLE}` },
       top_n: { type: 'number', description: '只返回前 N 名（excluded 仍全量返回）' },
     },
     op: 'rank_candidates',
