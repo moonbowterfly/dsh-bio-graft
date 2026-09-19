@@ -19,18 +19,19 @@
 | **gem** | 晶石（模型资产） | 基因组尺度代谢模型：构建/验证/补洞/账本 |
 | **graft** | 嫁接（序列变更） | 基因编辑设计：sgRNA 候选 / 评分向量 / 脱靶扫描 / EditPlan 账本 |
 
-## 接入状态（2026-09-14）
+## 接入状态（2026-09-19 实测）
 
 | 能力 | 状态 |
 |---|---|
-| `graft_*` 工具注册（与 genie 工具同实例共存） | ✅ 已实现 |
+| `graft_*` 工具注册（与 genie 工具同实例共存） | ✅ 已实现（11 个语义化工具） |
 | `graft-expert` skill（经 `ctx.skills.register` 汇入 agent 的 skill 目录） | ✅ 已实现 |
-| hosted-domain integration 协议（`/api/dsh-bio-graft/integration/health`、`/v1/status`） | ⚠️ **载荷仍为早期形状**，尚未对齐 `genie/docs/plugin-integration.md` v2 契约（字段名/`checks` 数组/`generatedAt` 等）——批次 B |
-| genie 设置面板「基因编辑设计」条件分页 | ❌ **未实现**（早前 README 的说法不成立；genie 侧目前没有任何 graft 引用）——批次 B |
-| genie persona 能力域路由（存在性感知） | ❌ 未实现——批次 B |
+| hosted-domain integration 协议（`/api/dsh-bio-graft/integration/health`、`/v1/status`） | ✅ 已对齐 `genie/docs/plugin-integration.md` v2 契约（`checks` 数组 / `generatedAt` / `features` / 协议版本头，实机核验） |
+| genie 设置面板「基因编辑设计」条件分页 | ✅ 已实现（实机显示：已安装 · 协议就绪 / 版本 / 探测方式 / 协议 host v1·graft v1 / 语义化工具 11 个 / Cas-OFFinder 后端「已就绪」） |
+| genie persona 能力域路由（存在性感知） | ✅ 已实现（域注册表 + 存在性降级） |
 
-> 在批次 B 落地前：graft 只能通过**工具注册表**被 agent 直接调用，安装状态不体现在 BioGenie 面板里。
-> 计划与任务分解见 `docs/PLAN-2026-09-14.md`（施工依据）与 `docs/ARCHITECTURE.md`（架构）。
+> 全新环境实机验证（2026-09-19）：`dsh plugin add` 安装 tarball 后重启，BioGenie 设置面板
+> 「基因编辑设计」分页完整渲染 graft 运行时状态；integration 端点返回 v2 载荷。
+> 架构与协议细节见 `docs/ARCHITECTURE.md`、`src/integration.js`。
 
 ## 核心哲学
 
@@ -84,7 +85,7 @@ dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 
 （无全局 CLI 时：`npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft`）
 
-安装后 **无需任何额外准备**即可使用 9 个语义化工具（全部纯标准库 Python 实现，复用
+安装后 **无需额外准备**即可使用 11 个语义化工具（其中 10 个纯标准库 Python 实现，复用
 `dsh-bio-genie` 的自举解释器或系统 `python`）；**脱靶扫描**需要 Cas-OFFinder 二进制，
 由 `graft_backend_status(action="ensure")` 自动获取（仅 Windows；其他平台手动放置）。
 
@@ -138,9 +139,15 @@ GRAFT_STRICT=1 npm test  # 严格模式：探针/跳过一律 FAIL（用于 CI�
 | 批次 | 内容 | 状态 |
 |---|---|---|
 | A | 可信底座：FASTA/IUPAC/Cas-OFFinder 真实契约/cut_site/账本加固 + 测试网 | ✅ 完成 |
-| B | 契约化接入：integration v2 载荷 + `capabilities.json` + genie 侧域注册表/条件分页/persona 路由 | 计划中 |
-| C | 脱靶语义层（per-guide 汇总/seed 分布）+ 声明式 `graft_rank` + EditPlan 0.2 收口 | 计划中 |
-| D | 碱基编辑（BaseEditorProfile + `graft_base_edit` + bystander/密码子后果） | 计划中 |
+| B | 契约化接入：integration v2 载荷 + `capabilities.json` + genie 侧域注册表/条件分页/persona 路由 | ✅ 完成 |
+| C | 脱靶语义层（per-guide 汇总/seed 分布）+ 声明式 `graft_rank` + EditPlan 0.2 收口 | ✅ 完成 |
+| D | 碱基编辑（BaseEditorProfile + `graft_base_edit` + bystander/密码子后果） | ✅ 完成 |
+| E′ | EditStrategy 多 guide 策略 + pairwise 脱靶（第 10 个工具 `graft_strategy`） | ✅ 完成 |
+| F | 验证方案（第 11 个工具 `graft_validation_plan`） | ✅ 完成 |
+
+> 2026-09-19：全批完成后的审计修复轮——rank 目标轴缺失 fail-closed / base_edit `strand:'-'` 扫反链 /
+> single_cut 单候选 / 测试门禁加固（harness 非零退出 fail-closed、Cas-OFFinder 发现链三路径）/
+> 契约单一来源 `rank-contract.json`；`npm test` 204 断言全绿。
 
 > 版本号只递增 patch（0.1.1 → 0.1.2 …）；批次名不使用版本号，避免与 npm 版本混淆。
 
