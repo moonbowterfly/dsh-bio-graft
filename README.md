@@ -32,6 +32,8 @@
 > 全新环境实机验证（2026-09-19）：`dsh plugin add` 安装 tarball 后重启，BioGenie 设置面板
 > 「基因编辑设计」分页完整渲染 graft 运行时状态；integration 端点返回 v2 载荷。
 > 架构与协议细节见 `docs/ARCHITECTURE.md`、`src/integration.js`。
+>
+> **引擎兼容（2026-09-19）**：经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 共 55 张变更卡核对：零适配命中）与实机验证（工具注册 / 域面板 / Cas-OFFinder 就绪）。
 
 ## 核心哲学
 
