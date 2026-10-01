@@ -82,10 +82,25 @@ N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高
 ## 安装（作为 dsh 插件）
 
 ```bash
+# 0.1.x web / 有全局 CLI 时
 dsh plugin --profile web add @dsh-bio/dsh-bio-graft
+
+# 无全局 CLI 时：
+npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 ```
 
-（无全局 CLI 时：`npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft`）
+**安装到 dsh 桌面端（0.2.0+，推荐）**——桌面端内置 dsh 命令与 pnpm，无需另装 Node/pnpm：
+
+1. 先启动一次桌面端（初始化 `desktop` profile），**完全退出应用**；
+2. 用桌面端自带 CLI 安装（Windows 默认安装路径）：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @dsh-bio/dsh-bio-graft
+```
+
+3. 重新打开桌面端生效（也可直接在桌面端内 **「插件」页**输入包名安装，无需退出应用）。
+
+> 引擎兼容：0.1.x（`--profile web`）与 0.2.0+（桌面端 `--profile desktop`）均已实测——2026-10-01 桌面端 0.2.0-rc.2：11 个工具全量注册 + `graft_backend_status` 真实执行。
 
 安装后 **无需额外准备**即可使用 11 个语义化工具（其中 10 个纯标准库 Python 实现，复用
 `dsh-bio-genie` 的自举解释器或系统 `python`）；**脱靶扫描**需要 Cas-OFFinder 二进制，

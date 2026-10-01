@@ -76,10 +76,25 @@ Every result carries a machine-readable `interpretation_boundary`; zero hits add
 ## Install
 
 ```bash
+# 0.1.x web / with a global CLI
 dsh plugin --profile web add @dsh-bio/dsh-bio-graft
+
+# no global CLI:
+npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 ```
 
-(no global CLI: `npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft`)
+**Install into the dsh desktop app (0.2.0+, recommended)** — the desktop app bundles its own dsh command and pnpm (no separate Node/pnpm needed):
+
+1. Launch the desktop app once (initializes the `desktop` profile), then **fully quit it**;
+2. Install with the bundled CLI (default Windows install path):
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @dsh-bio/dsh-bio-graft
+```
+
+3. Reopen the desktop app to apply (or use the in-app **Plugins** page with the package name — no quit needed).
+
+> Engine compatibility: verified on both 0.1.x (`--profile web`) and 0.2.0+ (desktop app, `--profile desktop`) — 2026-10-01, desktop 0.2.0-rc.2: all 11 tools registered + `graft_backend_status` executed for real.
 
 Nothing else is needed for the 9 semantic tools — they are pure-stdlib Python and reuse the
 `dsh-bio-genie` bootstrapped interpreter (or any `python` on PATH). **Off-target scanning** needs the
