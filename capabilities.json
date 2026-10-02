@@ -57,8 +57,10 @@
     ],
     "healthPath": "/api/dsh-bio-graft/integration/health",
     "statusPath": "/api/dsh-bio-graft/integration/v1/status",
+    "capabilitiesPath": "/api/dsh-bio-graft/integration/v1/capabilities",
     "features": [
       "status",
+      "capabilities",
       "editor-registry",
       "editplans",
       "offtarget-backend",

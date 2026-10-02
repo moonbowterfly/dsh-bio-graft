@@ -4,6 +4,7 @@
  * 契约：`dsh-bio-genie/docs/plugin-integration.md` §2.3（health）/ §2.4（status）/ §3（六态）。
  *   GET {prefix}/health   — 协商端点：身份 + 协议版本 + features。**不 spawn Python、不写盘、不列目录**
  *   GET {prefix}/v1/status — 运行时快照：state / checks[] / generatedAt / data / env / remediations
+ *   GET {prefix}/v1/capabilities — 工具清单：由随包发布的 capabilities.json 提供
  *
  * 形状变更史：v0.1 载荷用 `plugin` + `protocol:{major,minors}` + `checks` 对象，
  * 与契约不符 —— 宿主适配器按固定字段名校验，会把 graft 判成 `installed-unavailable`
@@ -11,7 +12,7 @@
  *
  * 本模块没有 import 期探测：加载插件与提供 /health 绝不 spawn 进程、不修改数据目录。
  */
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { pythonCandidates } from './python.js'
@@ -24,6 +25,7 @@ export const PROTOCOL_MINORS = [0]
 export const RUNTIME_PROBE_CACHE_MS = 60_000
 export const INTEGRATION_FEATURES = [
   'status',
+  'capabilities',
   'editor-registry',
   'editplans',
   'offtarget-backend',
@@ -31,6 +33,9 @@ export const INTEGRATION_FEATURES = [
 ]
 
 const PLUGIN_ID = 'dsh-bio-graft'
+const CAPABILITIES_CONTRACT_VERSION = '1'
+const CAPABILITIES_MANIFEST = JSON.parse(
+  readFileSync(new URL('../capabilities.json', import.meta.url), 'utf8'))
 
 function defaultDataRoot() {
   const dshHome = process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
@@ -133,6 +138,20 @@ export function createIntegrationService() {
           protocolMajor: PROTOCOL_MAJOR,
           protocolMinors: PROTOCOL_MINORS,
           features: INTEGRATION_FEATURES,
+        },
+      }
+    },
+
+    async capabilities() {
+      const tools = CAPABILITIES_MANIFEST.tools.map((name) => ({ name }))
+      return {
+        ok: true,
+        value: {
+          contract_version: CAPABILITIES_CONTRACT_VERSION,
+          plugin_id: PLUGIN_ID,
+          plugin_version: PLUGIN_VERSION,
+          tool_count: tools.length,
+          tools,
         },
       }
     },
@@ -248,6 +267,16 @@ export function registerIntegrationRoutes(ctx, { service }) {
         service.status(),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), HARD_TIMEOUT_MS)),
       ]))
+    },
+  }))
+
+  disposers.push(ctx.webServer.register({
+    kind: 'exact',
+    path: `${INTEGRATION_PREFIX}/v1/capabilities`,
+    handler: (req, res) => {
+      if (!loopbackOnly(req)) return writeJson(res, 403, { ok: false, code: 'loopback-required' })
+      if (req.method !== 'GET') return writeJson(res, 405, { ok: false, code: 'method-not-allowed' })
+      return respond(res, () => service.capabilities())
     },
   }))
 
