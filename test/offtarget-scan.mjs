@@ -211,6 +211,28 @@ if (!BACKEND?.ok || !BIN || !existsSync(BIN)) {
     (res.hits ?? []).some((h) => h.position_0based === seedPos0 && h.mismatches === 1),
     `expected ${seedPos0}`)
 
+  // ---------- ②c top_n 截断：per_guide 统计必须完整（2026-10-04 修复）----------
+  // 修复背景：旧实现把 top_n 当「读取上限」（满行即停），未读到的 query 在
+  // per_guide 中被误报 n_hits=0——把「未读取」显示成「零命中」的假安全结论。
+  // 变异锚点：把 _parse_hits 改回「满 top_n 行即停」，本段必须报红。
+  const trunc = op('offtarget_scan', {
+    genome_file: genomeNative,
+    queries: [`${GUIDE}AGG`, `${GUIDE_1MM}AGG`],
+    pattern: 'N20NGG',
+    mismatches: 3,
+    device: 'auto',
+    top_n: 1,
+  }, { timeoutMs: 300_000 })
+  check('truncated return list is capped at top_n',
+    (trunc.hits ?? []).length === 1 && trunc.hits_truncated === true,
+    `hits=${(trunc.hits ?? []).length} truncated=${trunc.hits_truncated}`)
+  check('n_hits still reports the full count (not the truncated list length)',
+    trunc.n_hits > 1, `n_hits=${trunc.n_hits}`)
+  const truncPg = trunc.per_guide ?? []
+  check('per_guide covers BOTH queries with their true hit counts (no fake zeros)',
+    truncPg.length === 2 && truncPg.every((g) => g.n_hits >= 1),
+    JSON.stringify(truncPg.map((g) => ({ q: g.query, n: g.n_hits }))))
+
   // ---------- ③ 假阴性护栏：0 命中必须带排查提示 ----------
   const empty = op('offtarget_scan', {
     genome_file: genomeNative,

@@ -95,6 +95,11 @@ def _pair_geometry(a: dict, b: dict, *, cds_start_0: int | None = None) -> dict 
             min(a.get('end_0'), b.get('end_0')) > max(a.get('start_0'), b.get('start_0'))),
         'same_strand': a.get('strand') == b.get('strand'),
         'in_frame': (None if cds_start_0 is None else (size % 3 == 0)),
+        'in_frame_scope': ('geometry-only（长度取模 %3）——不检查连接点翻译后果'
+                           '（提前终止 / 蛋白完整性），%3==0 不保证可译；'
+                           '实战反例：某 132bp 缺失 %3==0 但翻译后仅剩 6aa——'
+                           '发布设计前必须对连接点做翻译层验证'
+                           if cds_start_0 is not None else None),
         'frameshift_note': ('缺失长度 %3 != 0 → 移码；%3 == 0 → 保持读码框（对敲除而言移码通常更彻底）'
                             if cds_start_0 is not None else
                             '未声明 cds_start_0：不判断移码（不猜读码框）'),

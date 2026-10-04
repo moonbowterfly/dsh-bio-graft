@@ -266,4 +266,6 @@ def score_guides(candidates: list, editor: str = 'SpCas9', **kwargs) -> dict:
         'candidates': scored,
         'score_semantics': ('score vector only — 不产生综合分；'
                             'rank 由 graft_rank / plan_create 按声明的 objective 完成'),
+        'u6_start_pref_note': ('u6_start_pref = 转录首碱基偏好 G——真核 U6 启动子惯例；'
+                               '原核（pTarget 类质粒 / 基因组整合）场景不适用，勿据此筛选'),
     }

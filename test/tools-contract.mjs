@@ -39,8 +39,17 @@ check('registers exactly the documented tool set',
 
 for (const tool of registered) {
   for (const [key, spec] of Object.entries(tool.parameters ?? {})) {
-    const target = spec?.items?.type === 'object' ? spec.items : spec
-    if (target?.type === 'object') {
+    // 收集该参数下所有 object 节点：参数本身 / items / items.oneOf 的各分支
+    // （oneOf 受 dsh schema DSL 支持；分支内的 object 同样必须声明 additionalProperties）
+    const targets = []
+    if (spec?.type === 'object') targets.push(spec)
+    if (spec?.items?.type === 'object') targets.push(spec.items)
+    if (Array.isArray(spec?.items?.oneOf)) {
+      for (const branch of spec.items.oneOf) {
+        if (branch?.type === 'object') targets.push(branch)
+      }
+    }
+    for (const target of targets) {
       check(`${tool.name}.${key} declares additionalProperties`,
         target.additionalProperties === true || target.additionalProperties === false,
         '(dsh schema validator raises UNSUPPORTED_SCHEMA without it)')

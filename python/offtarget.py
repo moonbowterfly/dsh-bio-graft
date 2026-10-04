@@ -296,10 +296,16 @@ def genome_preflight(genome_path: str, max_records: int = 5000) -> dict:
     return info
 
 
-def _parse_hits(path: str, top_n: int) -> tuple[list[dict], bool]:
-    """解析 Cas-OFFinder 6 列输出（无表头，0-based 坐标，错配碱基小写）。"""
+def _parse_hits(path: str) -> list[dict]:
+    """解析 Cas-OFFinder 6 列输出（无表头，0-based 坐标，错配碱基小写）。
+
+    2026-10-04 修复（实战测试暴露）：**读完全部行**。旧实现满 top_n 行即停，
+    截断后的行不再进入解析——而 per_guide 从解析结果统计，导致未读到的
+    query 被误报 `n_hits: 0`（把「未读取」显示成「零命中」的假安全结论）。
+    top_n 的语义是「返回列表上限」——截断只由调用方对**返回列表**执行，
+    绝不截断统计。
+    """
     hits = []
-    truncated = False
     with open(path, encoding='utf-8', errors='replace') as f:
         for line in f:
             line = line.rstrip('\r\n')
@@ -325,10 +331,7 @@ def _parse_hits(path: str, top_n: int) -> tuple[list[dict], bool]:
                 'mismatch_positions_1based': [
                     i + 1 for i, ch in enumerate(matched) if ch.islower()],
             })
-            if len(hits) >= top_n:
-                truncated = True
-                break
-    return hits, truncated
+    return hits
 
 
 def queries_from_candidates(candidates: list, editor: str = 'SpCas9') -> tuple[list[str], str]:
@@ -436,7 +439,9 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
                 'input_file': input_file.replace('\\', '/'),
                 'interpretation_boundary': INTERPRETATION_BOUNDARY}
 
-    hits, truncated = _parse_hits(tmp_out, top_n)
+    hits_all = _parse_hits(tmp_out)
+    truncated = len(hits_all) > top_n
+    hits = hits_all[:top_n] if truncated else hits_all
     result = {
         'ok': True,
         'mode': 'scan',
@@ -444,7 +449,8 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
         # ── 批次 C 语义层：只给 observation，不给结论 ──────────────────────────
         'search_completeness': build_search_completeness(mismatch_searched=True),
         'assessment': build_assessment(),
-        'per_guide': aggregate_per_guide(hits, queries, seed_length=seed_length,
+        # per_guide 统计基于**全量**命中（hits_all）——top_n 截断只作用于返回列表
+        'per_guide': aggregate_per_guide(hits_all, queries, seed_length=seed_length,
                                          pam_side=pam_side),
         'search_parameters': {
             'genome_file': genome_file.replace('\\', '/'),
@@ -459,7 +465,7 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
         },
         'devices': devices,
         'genome_check': genome_check,
-        'n_hits': len(hits),
+        'n_hits': len(hits_all),
         'hits': hits,
         'hits_truncated': truncated,
         'raw_hits_file': tmp_out.replace('\\', '/'),
@@ -467,10 +473,10 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
         'attempts': attempts,
         'interpretation_boundary': INTERPRETATION_BOUNDARY,
     }
-    if not hits:
+    if not hits_all:
         result['zero_hit_warning'] = ZERO_HIT_WARNING
-    if any(h['mismatches'] == 0 for h in hits):
-        result['notes'] = [f"命中中含 {sum(1 for h in hits if h['mismatches'] == 0)} 条"
+    if any(h['mismatches'] == 0 for h in hits_all):
+        result['notes'] = [f"命中中含 {sum(1 for h in hits_all if h['mismatches'] == 0)} 条"
                            f"**完全匹配**位点（0 mismatch）——注意这可能包含设计靶点本身，"
                            f"解读时需按坐标与设计位点比对"]
     return result

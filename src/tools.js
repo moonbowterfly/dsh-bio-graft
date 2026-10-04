@@ -94,7 +94,7 @@ export function registerTools(ctx) {
       'seed_8nt_pam_proximal + warnings（极端 GC/自回文/同聚物/长度异常），**不打综合分**。' +
       '触发词：打分、评分、on-target 分、guide 评分。',
     parameters: {
-      candidates: { type: 'array', required: true, description: 'graft_design 返回的 candidates 数组（含 protospacer 字段）', items: { type: 'object', additionalProperties: true } },
+      candidates: { type: 'array', required: true, description: 'graft_design 返回的 candidates 数组（含 protospacer 字段）；也接受裸序列字符串数组', items: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'string' }] } },
       editor: { type: 'string', description: '编辑酶名（默认 SpCas9）' },
     },
     op: 'guide_score',
