@@ -10,7 +10,7 @@ import os from 'node:os'
 const PYTHON_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'python')
 
 /**
- * 候选解释器，按优先级（通用化，不写死本机路径）：
+ * 候选解释器，按优先级（通用化，不写死任何机器特定路径）：
  *   1. `GRAFT_PYTHON`  — 用户显式指定，最高优先级
  *   2. 宿主自举环境     — `$DSH_HOME/dsh-bio-genie/python-env`（genie 第一层
  *      依赖含 matplotlib/pandas/mpi4py/biopython 等，graft 无需额外科学生物库

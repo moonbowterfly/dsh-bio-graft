@@ -178,7 +178,7 @@ if (!BACKEND?.ok || !BIN || !existsSync(BIN)) {
     res.search_completeness?.structural_variation === 'not_searched' &&
     res.search_completeness?.sample_variants === 'not_searched',
     JSON.stringify(res.search_completeness))
-  // 断言「API 里不存在 safety 结论字段」要按 **key** 走查：forbidden_phrasing 里出现 "safe"
+  // 断言「API 里不存在 safety 结论字段」要按 **key** 检查：forbidden_phrasing 里出现 "safe"
   // 是设计的一部分（它正是禁词清单），字符串包含判断会误报。
   const hasKey = (obj, names) => {
     if (Array.isArray(obj)) return obj.some((x) => hasKey(x, names))

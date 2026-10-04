@@ -15,7 +15,7 @@ input 文件是**三段式**（旧实现只写「genome 路径 + pattern」两�
 输出：制表符分隔 6 列，**无表头**，行尾 CRLF：
     query | chromosome | position(0-based) | matched_sequence(错配碱基小写) | strand(+/-) | mismatch 数
 
-设备：CPU 设备需要 OpenCL CPU runtime。本机（RTX 3050 + AMD gfx90c）**没有 CPU
+设备：CPU 设备需要 OpenCL CPU runtime。部分独显机器**没有 CPU
 OpenCL 设备** —— 传 'C' 直接报 "No OpenCL devices found."（rc=1），必须用 'G0'。
 因此默认 device='auto'：解析可执行文件自报的设备表，优先 CPU（确定性最好），
 无 CPU 时按 ID 取第一个 GPU。

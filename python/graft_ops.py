@@ -9,7 +9,7 @@
     代码级失败判定在 TS 侧检测该头 → needs_repair=true
   - 输出前 _sanitize_json 递归规范化（-0.0→0.0, NaN/inf→null），规避 dsh snapshot 校验
 
-v0.1 op 一览（对齐 GPT 评审裁决的 MVP 切法）：
+v0.1 op 一览（对齐 设计评审决定的 MVP 切法）：
   profile_list        列出内置 NucleaseProfile（SpCas9/Cas12a/Cas12b/Cas13/BaseEditor 摘要）
   guide_enumerate     PAM 扫描枚举 sgRNA 候选（NucleaseProfile 驱动 PAM grammar）
   guide_score         on-target 评分向量（ scorecard 类 rule-set，不打综合分）
@@ -27,8 +27,8 @@ import sys
 # 必须显式插入，否则 editors/guides/plans 等同目录模块全部 ModuleNotFoundError。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ── 编解码契约（家族同款；graft 曾漏掉 stdin，2026-09-14 E2E 实测暴露）─────────────
-# Windows 上子进程的 stdin/stdout/stderr 默认按 locale（本机 GBK）编解码，而 TS 侧
+# ── 编解码契约（家族同款；graft 曾漏掉 stdin，2026-09-14 实测暴露）─────────────
+# Windows 上子进程的 stdin/stdout/stderr 默认按 locale（中文 Windows 默认 GBK）编解码，而 TS 侧
 # 永远写 UTF-8 字节。只重设 stdout 时，agent 传来的**任何非 ASCII 参数**（中文 notes、
 # 中文说明）会被按 GBK 误解码成乱码/代理项，随后写盘抛
 # "UnicodeEncodeError: ... surrogates not allowed"（实测 \udcab）→ 计划创建失败、

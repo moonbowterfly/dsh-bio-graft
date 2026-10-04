@@ -106,7 +106,7 @@ _register(NucleaseProfile(
     target_type='DNA', cut_offset=17, cut_structure='staggered',
     scoring_refs=['literature-default'],
     verified=False,
-    pam_source='待核：本机原始声明为 TNN，与作者记忆中的 AapCas12b「TTN」不一致；'
+    pam_source='待核：原始声明为 TNN，与作者记忆中的 AapCas12b「TTN」不一致；'
                '核对一手文献（Shmakov 2015 / Teng 2018 / Strecker 2019）后再置 verified=True',
     notes='PAM 与几何**未核对**——报告里必须标明未验证，不得当作既定事实。',
 ))

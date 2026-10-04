@@ -116,7 +116,7 @@ export function registerTools(ctx) {
       '（API 里不存在 safe:true / risk_level，禁词清单见 forbidden_phrasing）；' +
       '③ per_guide——每条 query 的命中数/mismatch 分布/seed 区命中数/最近位点/是否含精确匹配。' +
       'preflight_only=true 时只做基因组体检（记录数/总 bp/N 比例/是否 CRLF）不扫描——' +
-      '**长扫描前建议先 preflight**。device 默认 auto（本机若没有 CPU OpenCL 设备会自动改用 GPU 并回显实际设备）。' +
+      '**长扫描前建议先 preflight**。device 默认 auto（机器上没有 CPU OpenCL 设备时会自动改用 GPU 并回显实际设备）。' +
       '⚠️ **铁律：本工具的结果不能得出「安全」/「无脱靶」结论**——只能说' +
       '「在当前搜索参数下未检出高分位点」；n_hits=0 时返回 zero_hit_warning 列明常见假阴性原因，' +
       '必须排查而不是报平安。返回值始终带 interpretation_boundary（机器可读边界声明）。' +

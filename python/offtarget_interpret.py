@@ -1,6 +1,6 @@
 """offtarget_interpret.py — 把 Cas-OFFinder 原始命中翻译成 **CRISPR 语义记录**（批次 C）。
 
-设计原则（graft 铁律的工程化，GPT 裁决 #1/#2/#7/#9 定稿）：
+设计原则（graft 铁律的工程化，设计决定 #1/#2/#7/#9 定稿）：
   ① `search_completeness`：**枚举**本次搜索覆盖了哪些维度、哪些**没搜**（bulge/结构变异/
      样本变异）。「没搜」和「搜了没命中」科学意义完全不同——这是最容易被误读成「安全」的地方。
   ② `assessment.safety_conclusion` 恒为 `not_supported`：API 里**不存在** `safe: true`，

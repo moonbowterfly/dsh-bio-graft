@@ -33,7 +33,7 @@
 > 「基因编辑设计」分页完整渲染 graft 运行时状态；integration 端点返回 v2 载荷。
 > 架构与协议细节见 `docs/ARCHITECTURE.md`、`src/integration.js`。
 >
-> **引擎兼容（2026-09-19）**：经 dsh **0.1.5-rc.2** 走廊逐卡走查（v0.1.3-alpha.2 → 0.1.5-rc.2 共 55 张变更卡核对：零适配命中）与实机验证（工具注册 / 域面板 / Cas-OFFinder 就绪）。
+> **引擎兼容（2026-09-19）**：经 dsh **0.1.5-rc.2** 完整兼容核验（v0.1.3-alpha.2 → 0.1.5-rc.2 全量变更核对：零适配命中）与实机验证（工具注册 / 域面板 / Cas-OFFinder 就绪）。
 
 ## 核心哲学
 
@@ -114,7 +114,7 @@ npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 | Cas-OFFinder（可选） | 官方 Windows x86-64 二进制 v2.4.1（BSD-3）。`graft_backend_status action=ensure` 自动下载到 `~/.dsh/dsh-bio-graft/bin/` |
 | OpenCL 运行时 | Cas-OFFinder 需要 OpenCL 设备（GPU 驱动自带；纯 CPU 运行需 Intel/AMD OpenCL runtime）。`action=devices` 可查；`device=auto` 自动选择 |
 
-> ⚠️ 实测：本机（NVIDIA RTX 3050 + AMD gfx90c）**没有 CPU OpenCL 设备**，传 `C` 会直接报
+> ⚠️ 实测：在**没有 CPU OpenCL 设备**的机器上（仅独显、未装 CPU OpenCL 运行时），传 `C` 会直接报
 > `No OpenCL devices found.`——所以默认 `device=auto`，并回显实际使用的设备与选择理由。
 
 ## 数据目录

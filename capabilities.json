@@ -107,7 +107,7 @@
         "license": "BSD-3-Clause",
         "bundled": false,
         "obtain": "graft_backend_status(action=\"ensure\")，或手动放置到 ~/.dsh/dsh-bio-graft/bin/",
-        "note": "需要 OpenCL 设备；本机实测无 CPU OpenCL 设备时须用 GPU（device=auto 自动选择）"
+        "note": "需要 OpenCL 设备；无 CPU OpenCL 设备时须用 GPU（device=auto 自动选择）"
       }
     ]
   },

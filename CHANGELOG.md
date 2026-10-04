@@ -15,7 +15,7 @@
 - **测试网 `npm test` = 145 断言**（工具/op 契约、黄金 op、真实 Cas-OFFinder 夹具、排名夹具、
   碱基编辑夹具、integration 契约；`GRAFT_STRICT=1` 严格模式禁止静默跳过）。
 - 文档：`docs/ARCHITECTURE.md`、`docs/PROFILES-TODO.md`（编辑器几何/窗口的证据债清单）、
-  `docs/decisions/`（设计裁决记录）、`docs/PLAN-2026-09-14.md`（施工计划）。
+  以及 `docs/releases/` 发布说明。
 
 ### 新工具与能力（批次 C/D）
 - **`graft_rank`**：声明式排名 —— `pareto` / `lexicographic` / `weighted`（**须显式给权重**）；
@@ -39,7 +39,7 @@
   `per_guide`（mismatch 分布 / seed 区命中 / 最近位点）；`preflight_only` 基因组体检；`device=auto`。
 - `graft_design` 候选新增 **切割位点**（`cut_site_0` + `cut_site_convention` + `cut_site_verified`）。
 
-### 修复（批次 A + E2E 回流）
+### 修复（批次 A + 实测回流）
 - **Cas-OFFinder 调用契约**：三段式 input 文件（genome 路径 / pattern / query+mismatch）、
   `exe <input> {C|G|A} <out>`、无表头 6 列 0-based 解析 —— 此前脱靶扫描**从未真正可用**。
 - **FASTA 输入解析**：旧实现先拼接再正则，贪婪头行吃掉整条序列 → 任何 FASTA 输入必失败。

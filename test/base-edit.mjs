@@ -1,6 +1,6 @@
 // test/base-edit.mjs — 碱基编辑设计（graft_base_edit）黄金夹具（全部手工可算）。
 //
-// 契约（GPT 裁决 #5/#9）：
+// 契约（设计决定 #5/#9）：
 //   · 五层 profile（targeting/chemistry/activity/evidence/applicability）原样带出，可逐层引用
 //   · **窗口内 = 几何兼容，不推活性**：payload 里不得出现任何效率/活性预测字段
 //   · 链语义三件套：guide_strand / edited_physical_strand / reference_reported_substitution

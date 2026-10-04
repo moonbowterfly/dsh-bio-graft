@@ -17,18 +17,18 @@
 | **dsh-bio-gem** | Genome-scale metabolic models: build / validate / gap-fill / ledger |
 | **dsh-bio-graft** | Gene-editing design: sgRNA candidates, score vectors, off-target scanning, EditPlan ledger |
 
-## Integration status (2026-09-14)
+## Integration status (2026-09-19)
 
 | Capability | Status |
 |---|---|
 | `graft_*` tools registered alongside the host's `bio_*` tools | ✅ implemented |
 | `graft-expert` skill (reaches the agent's skill catalog) | ✅ implemented |
-| Hosted-domain integration API (`/api/dsh-bio-graft/integration/health`, `/v1/status`) | ⚠️ payload still in its early shape — not yet aligned with the host's protocol v2 (batch B) |
-| BioGenie settings panel "gene-editing" conditional tab | ❌ not implemented yet (batch B) |
-| Host `persona` capability-domain routing (existence-aware) | ❌ not implemented yet (batch B) |
+| Hosted-domain integration API (`/api/dsh-bio-graft/integration/health`, `/v1/status`) | ✅ aligned with the host's protocol v2 (checks array / generatedAt / features / protocol header) |
+| BioGenie settings panel "gene-editing" conditional tab | ✅ implemented (installed · protocol ready / version / probe mode / 11 tools / Cas-OFFinder backend) |
+| Host `persona` capability-domain routing (existence-aware) | ✅ implemented (domain registry + existence-aware fallback) |
 
-Until batch B lands, graft is reachable **only through the tool registry** — its install state is
-not shown in the BioGenie panel.
+graft is fully integrated with the host: tools registered alongside `bio_*`, skill surfaced to
+the agent, and the BioGenie panel renders its runtime state.
 
 ## Design principles
 
@@ -109,8 +109,8 @@ manually elsewhere).
 | Cas-OFFinder (optional) | Official Windows x86-64 binary v2.4.1 (BSD-3); `graft_backend_status action=ensure` downloads it to `~/.dsh/dsh-bio-graft/bin/` |
 | OpenCL runtime | Cas-OFFinder needs an OpenCL device (GPU drivers usually ship one; CPU-only use needs an Intel/AMD OpenCL runtime). Query with `action=devices`; `device=auto` picks one |
 
-> Measured on this machine (NVIDIA RTX 3050 + AMD gfx90c): there is **no CPU OpenCL device**,
-> so `device=C` fails immediately with `No OpenCL devices found.` — hence `device=auto`
+> Measured: on machines **without a CPU OpenCL device** (discrete-GPU-only setups),
+> `device=C` fails immediately with `No OpenCL devices found.` — hence `device=auto`
 > (which reports the device it actually used and why).
 
 ## Data directory

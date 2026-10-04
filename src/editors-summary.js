@@ -28,7 +28,7 @@ export const EDITORS_SUMMARY = [
   {
     name: 'Cas12b', casualName: 'Cas12b (TTN/TNN — 待核)', pam: 'TTN', pamSide: '5prime',
     spacerLength: 20, targetType: 'DNA', cutOffset: 17, cutStructure: 'staggered',
-    verified: false, pamSource: '待核：本机原声明 TNN 与 TTN 存疑；见 docs/PROFILES-TODO.md',
+    verified: false, pamSource: '待核：原声明 TNN 与 TTN 存疑；见 docs/PROFILES-TODO.md',
   },
   {
     name: 'Cas13a', casualName: 'Cas13a (RNA targeting)', pam: 'NNN', pamSide: '3prime',

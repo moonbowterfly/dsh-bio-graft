@@ -1,6 +1,6 @@
 // test/validation.mjs — 验证方案（ValidationRequirement[]）黄金断言。
 //
-// 契约（GPT 裁决 #11/#18 + 用户两层生成契约）：
+// 契约（设计决定 #11/#18 + 用户两层生成契约）：
 //   · 分档 required / recommended / conditional，每条含 question + why（不许空理由）
 //   · 模态差异：碱基编辑必查 bystander 与全产物谱；HDR 必查双侧连接点；双 guide 缺失必查连接点/长度/区段缺失
 //   · 宿主差异：植物额外出现嵌合/合子性等；cell_line 不得出现植物项

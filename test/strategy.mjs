@@ -1,6 +1,6 @@
 // test/strategy.mjs — EditStrategy（多 guide 几何）黄金夹具（人工可算）。
 //
-// 契约（GPT 裁决 #6/#16）：
+// 契约（设计决定 #6/#16）：
 //   · 多 guide 不是 Guide[]：几何（切点→缺失区间/junction/移码/PAM 朝向）+ 组合事实（两两脱靶）
 //   · **pairwise 不是把两条 guide 的风险相加**；数据缺失 = not_searched（负证据语义）
 //   · 未实现的策略（prime_edit / hdr / multiplex…）显式 implemented:false + cannot_design

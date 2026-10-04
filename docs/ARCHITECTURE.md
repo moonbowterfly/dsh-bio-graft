@@ -1,6 +1,6 @@
 # dsh-bio-graft 架构
 
-> 更新：2026-09-14（批次 A 完成后）。与 `docs/PLAN-2026-09-14.md` 配套阅读。
+> 更新：2026-09-14（批次 A 完成后）。
 
 ## 1. 定位与形态
 
@@ -105,7 +105,7 @@ agent 工具调用
 | 黄金 op | `test/golden-ops.mjs` | FASTA/多行输入、IUPAC PAM、cut_site 口径、账本序号单调/同名保护 |
 | 真实后端 | `test/offtarget-scan.mjs` | 真实 Cas-OFFinder：精确命中坐标、1-mismatch 错配位置、0 命中护栏、长度校验、缺基因组引导 |
 | 接入协议 | `test/integration-contract.mjs`（批次 B） | v2 载荷形状与 state 一致性 |
-| 真实会话 | `D:\Program\dsh\graft-plan-e2e` + 驱动脚本 | agent 真会用（配对 tool/call 与 tool/result）、无自愈 |
+| 真实会话 | 真实 dsh 会话端到端 | agent 真会用（配对 tool/call 与 tool/result）、无自愈 |
 | 宿主适配器 | genie `scripts/test-graft-adapter.mjs`（批次 B） | 六态矩阵 + gem 零漂移 |
 
 纪律：`GRAFT_STRICT=1` 下探针失败/跳过一律 FAIL（门不许静默跳过）。
