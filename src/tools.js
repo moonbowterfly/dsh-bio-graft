@@ -248,7 +248,8 @@ export function registerTools(ctx) {
       '窗口内第二个同底物碱基 = **bystander**（产物不纯），工具会列进 editable_positions 并给警告——' +
       '报告不能只写「实现了 C→T」。' +
       '密码子后果需显式声明 cds_start_0（未声明时返回 not_applicable，**不猜读码框**；' +
-      'cds_strand="-" 当前不支持）。' +
+      'cds_strand="-" 当前不支持）。密码子字段语义：codon_index 为 CDS 内 **0-based** 索引' +
+      '（第 N 个密码子 → codon_index = N-1），返回值同时附 codon_number_1based（= 第几个密码子）。' +
       '触发词：碱基编辑、CBE、ABE、C→T、A→G、bystander、点突变、无义突变、终止密码子、碱基编辑器。',
     parameters: {
       sequence: { type: 'string', required: true, description: '目标序列（FASTA / 裸 DNA / 文件路径；编辑窗口按该序列的 + 链坐标报告）' },

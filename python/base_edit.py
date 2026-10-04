@@ -38,7 +38,9 @@ _COMPLEMENT = str.maketrans('ACGTN', 'TGCAN')
 
 COORDINATE_SYSTEM = (
     'window/target 位置均为 **protospacer 内 1-based 编号，位置 1 = PAM-distal 端**，'
-    'PAM 记为位置 21–23（Gaudelli 2017 原文约定）；genome_pos_* 为参考序列 + 链的 0-based 坐标'
+    'PAM 记为位置 21–23（Gaudelli 2017 原文约定）；genome_pos_* 为参考序列 + 链的 0-based 坐标；'
+    'codon_index 为 **CDS 内 0-based 密码子索引**——第 N 个密码子 → codon_index = N-1'
+    '（同时附 codon_number_1based = codon_index + 1，避免 0/1 基歧义；2026-10-05 加注）'
 )
 
 
@@ -73,6 +75,7 @@ def _codon_effect(seq: str, *, genome_pos_0: int, cds_start_0: int, edited_base:
     return {
         'status': 'computed',
         'codon_index': codon_index,
+        'codon_number_1based': codon_index + 1,
         'codon_start_0': codon_start,
         'ref_codon': ref_codon,
         'alt_codon': alt_codon,

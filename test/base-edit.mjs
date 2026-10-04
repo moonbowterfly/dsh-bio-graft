@@ -66,6 +66,10 @@ if (myPlus) {
     e.codon_effect?.consequence === 'nonsense' && e.codon_effect?.ref_codon === 'CAG' &&
     e.codon_effect?.alt_codon === 'TAG' && e.codon_effect?.aa_alt === '*',
     JSON.stringify(e.codon_effect))
+  check('CBE: codon index semantics explicit — 0-based codon_index + codon_number_1based pair',
+    Number.isInteger(e.codon_effect?.codon_index) &&
+    e.codon_effect?.codon_number_1based === e.codon_effect.codon_index + 1,
+    JSON.stringify({ codon_index: e.codon_effect?.codon_index, codon_number_1based: e.codon_effect?.codon_number_1based }))
   check('CBE: nonsense carries an explicit warning (target vs risk depends on intent)',
     myPlus.warnings.some((w) => w.includes('终止密码子')),
     JSON.stringify(myPlus.warnings))
