@@ -213,7 +213,7 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
 
     warnings: list[str] = []
     if action == 'new' and not (reference or {}).get('sequence_hash'):
-        # 反幻觉（设计决定 #8）：没有参考序列摘要时，「为什么昨天 B 今天 D」无法排除
+        # 反幻觉纪律：没有参考序列摘要时，「为什么昨天 B 今天 D」无法排除
         # 「参考序列/组装版本换了」这一原因。不阻塞，但必须显式提醒。
         warnings.append('reference.sequence_hash 缺失：建议记录参考序列摘要（sha256），'
                         '否则未来无法从账本区分「策略变了」与「参考序列变了」')

@@ -127,7 +127,7 @@ manually elsewhere).
 ## Self-check
 
 ```bash
-npm test                 # tool contract + golden ops + real off-target scan (62 assertions)
+npm test                 # tool contract + golden ops + real off-target scan
 GRAFT_STRICT=1 npm test  # strict: probes/skips become FAIL (CI mode)
 ```
 
@@ -143,17 +143,21 @@ GRAFT_STRICT=1 npm test  # strict: probes/skips become FAIL (CI mode)
 
 MIT. **No license-incompatible third-party code is bundled**: Cas-OFFinder (BSD-3) is used as an
 external binary fetched by the user's machine; FlashFry (GPL-3+) / PrimeDesign (AGPL + commercial) /
-inDelphi (non-commercial) / CRISPResso2 (non-commercial academic EULA) are **external adapters only**.
+inDelphi (non-commercial) / CRISPResso2 (non-commercial academic EULA) are **never bundled** — no
+adapter for them exists today; any future integration would be external-adapter only (local install
+detected, subprocess call).
 See `THIRD_PARTY_NOTICES.md`.
 
-## Roadmap (batches, not version numbers)
+## Roadmap (milestones, not version numbers)
 
-| Batch | Content | Status |
+| Milestone | Content | Status |
 |---|---|---|
 | A | Trust foundation: FASTA / IUPAC / real Cas-OFFinder contract / cut sites / ledger hardening + test net | ✅ done |
-| B | Contract integration: integration v2 payload + `capabilities.json` + host domain registry / conditional tab / persona routing | planned |
-| C | Off-target semantics (per-guide aggregation, seed distribution) + declarative `graft_rank` + EditPlan 0.2 | planned |
-| D | Base editing (`BaseEditorProfile` + `graft_base_edit` + bystanders / codon consequences) | planned |
+| B | Contract integration: integration v2 payload + `capabilities.json` + host domain registry / conditional tab / persona routing | ✅ done |
+| C | Off-target semantics (per-guide aggregation, seed distribution) + declarative `graft_rank` + EditPlan 0.2 | ✅ done |
+| D | Base editing (`BaseEditorProfile` + `graft_base_edit` + bystanders / codon consequences) | ✅ done |
+| E′ | EditStrategy multi-guide strategies + pairwise off-target (`graft_strategy`) | ✅ done |
+| F | Validation plan (`graft_validation_plan`) | ✅ done |
 
 ---
 

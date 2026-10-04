@@ -446,7 +446,7 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
         'ok': True,
         'mode': 'scan',
         'backend': {'path': exe, 'source': exe_info.get('source')},
-        # ── 批次 C 语义层：只给 observation，不给结论 ──────────────────────────
+        # ── 语义层：只给 observation，不给结论 ────────────────────────────────
         'search_completeness': build_search_completeness(mismatch_searched=True),
         'assessment': build_assessment(),
         # per_guide 统计基于**全量**命中（hits_all）——top_n 截断只作用于返回列表

@@ -1,6 +1,6 @@
 // test/rank.mjs — graft_rank 声明式排名的黄金夹具（人工可算，期望值全部写死）。
 //
-// 设计契约（设计决定 #3 + #13）：
+// 设计契约（定稿）：
 //   · 三种 operator：hard_filters（约束）/ lexicographic（字典序）/ pareto（支配）/ weighted（仅显式给权重时）
 //   · 秩是 policy-dependent：返回体必须带 policy_id + policy_digest + policy_echo
 //   · **禁止默认隐形权重**；weighted 必须带 disclaimer，且给的是 declared_objective_value（非 "score"）

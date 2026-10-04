@@ -1,23 +1,23 @@
 # Changelog
 
 > 版本号规范：只递增 patch（0.0.1 步长）。
-> **0.1.0 / 0.1.1 未发布到 npm**；`0.1.2` 是首个 npm 发布版本（内容涵盖前两版全部改动）。
+> **0.1.0 – 0.1.2 未发布到 npm**；`0.1.3` 是首个 npm 发布版本（内容涵盖前三版全部改动）。
 
 ## 0.1.2 (2026-09-15)
 
-### 接入与工程（批次 A/B）
+### 接入与基建
 - **hosted-domain integration 协议 v2 载荷**：`health`（pluginId/pluginVersion/protocolMajor/protocolMinors/features）
   与 `status`（state/generatedAt/checks 数组/data/env/remediations）；宿主 genie 据此在设置面板托管
   「基因编辑设计」条件分页并做六态判定。
 - **`capabilities.json`** 能力声明（`dsh-bio/capabilities@1`）：域 id / 工具前缀 / 中英触发词 / 集成端点 /
   必检项 / 资产权威源 / 重叠规则 / 外部二进制 / 安全铁律。
 - **版本单一事实源**（`src/version.js` 读 package.json），消除硬编码漂移。
-- **测试网 `npm test` = 145 断言**（工具/op 契约、黄金 op、真实 Cas-OFFinder 夹具、排名夹具、
+- **测试网 `npm test`**（工具/op 契约、黄金 op、真实 Cas-OFFinder 夹具、排名夹具、
   碱基编辑夹具、integration 契约；`GRAFT_STRICT=1` 严格模式禁止静默跳过）。
 - 文档：`docs/ARCHITECTURE.md`、`docs/PROFILES-TODO.md`（编辑器几何/窗口的证据债清单）、
   以及 `docs/releases/` 发布说明。
 
-### 新工具与能力（批次 C/D）
+### 新工具与能力
 - **`graft_rank`**：声明式排名 —— `pareto` / `lexicographic` / `weighted`（**须显式给权重**）；
   返回 `policy_id` + `policy_digest`（策略随结果进 EditPlan）；硬过滤被剔除的候选带原因；
   **负证据语义**：依赖数据缺失（没做过该分析）时剔除并写明 `not_searched`，绝不静默通过。
@@ -39,7 +39,7 @@
   `per_guide`（mismatch 分布 / seed 区命中 / 最近位点）；`preflight_only` 基因组体检；`device=auto`。
 - `graft_design` 候选新增 **切割位点**（`cut_site_0` + `cut_site_convention` + `cut_site_verified`）。
 
-### 修复（批次 A + 实测回流）
+### 修复（基建 + 实测回流）
 - **Cas-OFFinder 调用契约**：三段式 input 文件（genome 路径 / pattern / query+mismatch）、
   `exe <input> {C|G|A} <out>`、无表头 6 列 0-based 解析 —— 此前脱靶扫描**从未真正可用**。
 - **FASTA 输入解析**：旧实现先拼接再正则，贪婪头行吃掉整条序列 → 任何 FASTA 输入必失败。
@@ -60,4 +60,4 @@
 
 - 0.1.0：初始骨架 —— NucleaseProfile 注册表、PAM 双向枚举、评分向量（不打综合分）、
   Cas-OFFinder 驱动、EditPlan（.editplan.json + append-only runs 账本）、风险分级门控。
-- 0.1.1：批次 A「可信底座」—— 修 9 个缺陷 + 建立测试网 + GitHub 仓库与 tag v0.1.1。
+- 0.1.1：首轮「可信底座」—— 修 9 个缺陷 + 建立测试网 + GitHub 仓库与 tag v0.1.1。

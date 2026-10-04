@@ -9,7 +9,7 @@
     代码级失败判定在 TS 侧检测该头 → needs_repair=true
   - 输出前 _sanitize_json 递归规范化（-0.0→0.0, NaN/inf→null），规避 dsh snapshot 校验
 
-v0.1 op 一览（对齐 设计评审决定的 MVP 切法）：
+v0.1 op 一览（对齐既定 MVP 切法）：
   profile_list        列出内置 NucleaseProfile（SpCas9/Cas12a/Cas12b/Cas13/BaseEditor 摘要）
   guide_enumerate     PAM 扫描枚举 sgRNA 候选（NucleaseProfile 驱动 PAM grammar）
   guide_score         on-target 评分向量（ scorecard 类 rule-set，不打综合分）

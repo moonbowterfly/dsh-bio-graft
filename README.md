@@ -131,7 +131,7 @@ npx -y @deepseek-ai/dsh plugin --profile web add @dsh-bio/dsh-bio-graft
 ## 自检与回归
 
 ```bash
-npm test                 # 工具契约 + 黄金 op + 真实脱靶扫描（52 断言）
+npm test                 # 工具契约 + 黄金 op + 真实脱靶扫描
 GRAFT_STRICT=1 npm test  # 严格模式：探针/跳过一律 FAIL（用于 CI，杜绝静默跳过）
 ```
 
@@ -149,11 +149,11 @@ GRAFT_STRICT=1 npm test  # 严格模式：探针/跳过一律 FAIL（用于 CI�
 
 - Cas-OFFinder（BSD-3）以**外部二进制**形式由用户机器托管（自动下载/手动放置），详见 `THIRD_PARTY_NOTICES.md`
 - FlashFry（GPL-3+）/ PrimeDesign（AGPL+商业双许可）/ inDelphi（非商业）/
-  CRISPResso2（非商业学术 EULA）→ 一律 **external adapter**，检测到用户合法安装时接入
+  CRISPResso2（非商业学术 EULA）→ **永不 bundle**；当前未实现任何适配器，未来若接入只以 external adapter 形式（检测用户合法安装后子进程调用）
 
-## 能力批次
+## 能力里程碑
 
-| 批次 | 内容 | 状态 |
+| 里程碑 | 内容 | 状态 |
 |---|---|---|
 | A | 可信底座：FASTA/IUPAC/Cas-OFFinder 真实契约/cut_site/账本加固 + 测试网 | ✅ 完成 |
 | B | 契约化接入：integration v2 载荷 + `capabilities.json` + genie 侧域注册表/条件分页/persona 路由 | ✅ 完成 |
@@ -162,11 +162,11 @@ GRAFT_STRICT=1 npm test  # 严格模式：探针/跳过一律 FAIL（用于 CI�
 | E′ | EditStrategy 多 guide 策略 + pairwise 脱靶（第 10 个工具 `graft_strategy`） | ✅ 完成 |
 | F | 验证方案（第 11 个工具 `graft_validation_plan`） | ✅ 完成 |
 
-> 2026-09-19：全批完成后的审计修复轮——rank 目标轴缺失 fail-closed / base_edit `strand:'-'` 扫反链 /
+> 2026-09-19：全批完成后的质量修复轮——rank 目标轴缺失 fail-closed / base_edit `strand:'-'` 扫反链 /
 > single_cut 单候选 / 测试门禁加固（harness 非零退出 fail-closed、Cas-OFFinder 发现链三路径）/
-> 契约单一来源 `rank-contract.json`；`npm test` 204 断言全绿。
+> 契约单一来源 `rank-contract.json`；`npm test` 全部通过。
 
-> 版本号只递增 patch（0.1.1 → 0.1.2 …）；批次名不使用版本号，避免与 npm 版本混淆。
+> 版本号只递增 patch（0.1.1 → 0.1.2 …）；里程碑名不使用版本号，避免与 npm 版本混淆。
 
 ## 架构
 

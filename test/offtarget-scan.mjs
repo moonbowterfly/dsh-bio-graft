@@ -170,7 +170,7 @@ if (!BACKEND?.ok || !BIN || !existsSync(BIN)) {
     res.interpretation_boundary.includes('不构成'),
     String(res.interpretation_boundary).slice(0, 60))
 
-  // ---------- ②b 批次 C：结构化语义（search_completeness / assessment / per_guide）----------
+  // ---------- ②b 结构化语义（search_completeness / assessment / per_guide）----------
   check('search_completeness enumerates what was NOT searched',
     res.search_completeness?.mismatch === 'searched' &&
     res.search_completeness?.dna_bulge === 'not_searched' &&

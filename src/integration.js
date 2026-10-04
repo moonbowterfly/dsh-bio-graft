@@ -1,5 +1,5 @@
 /**
- * dsh-bio-graft — hosted-domain integration protocol v2（只读批次）。
+ * dsh-bio-graft — hosted-domain integration protocol v2（只读）。
  *
  * 契约：`dsh-bio-genie/docs/plugin-integration.md` §2.3（health）/ §2.4（status）/ §3（六态）。
  *   GET {prefix}/health   — 协商端点：身份 + 协议版本 + features。**不 spawn Python、不写盘、不列目录**

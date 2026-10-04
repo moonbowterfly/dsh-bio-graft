@@ -110,7 +110,7 @@ export function registerTools(ctx) {
       '② queries（显式 spacer+PAM 字面量列表）；③ pattern（配合 queries 用，如 N20NGG）。' +
       '每条命中返回 chromosome / position_0based / position_1based / matched_sequence（错配碱基小写）/' +
       'strand / mismatches / mismatch_positions_1based。' +
-      '**批次 C 起返回结构化语义**：① search_completeness——**枚举哪些维度没搜**' +
+      '**返回结构化语义**：① search_completeness——**枚举哪些维度没搜**' +
       '（dna_bulge/rna_bulge/structural_variation/sample_variants 恒为 not_searched；' +
       '「没搜」≠「搜了没命中」）；② assessment.safety_conclusion 恒为 not_supported' +
       '（API 里不存在 safe:true / risk_level，禁词清单见 forbidden_phrasing）；' +
@@ -145,7 +145,7 @@ export function registerTools(ctx) {
       '~/.dsh/dsh-bio-graft/bin/ → PATH → 插件目录四处）；action=devices 列出 OpenCL 设备（判断能否扫描、' +
       '该用哪个 device）；action=ensure 自动下载官方 BSD-3 Windows x86-64 二进制（v2.4.1，约 180KB，' +
       '仅在 Windows 可用；非 Windows 明确拒绝）。' +
-      '未来 provider（FlashFry/PrimeDesign/CRISPResso2 均为 GPL/学术专用许可，**永不 bundle**）也只走 external adapter。' +
+      '计划中的第三方 provider（FlashFry/PrimeDesign/CRISPResso2 均为 GPL/学术专用许可，**永不 bundle**）如接入也只走 external adapter。' +
       '触发词：后端状态、安装 cas-offinder、探测后端、OpenCL 设备、为什么扫描失败。',
     parameters: {
       action: { type: 'string', enum: ['status', 'devices', 'ensure'], description: 'status=探测；devices=列设备；ensure=缺则自动下载安装' },

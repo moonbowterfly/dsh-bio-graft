@@ -1,6 +1,6 @@
 // test/integration-contract.mjs — hosted-domain integration 协议 v2 形状断言。
 //
-// 契约文档：D:/Program/Github/dsh-bio-genie/docs/plugin-integration.md §2.3（health）/§2.4（status）
+// 契约文档：dsh-bio-genie 仓库 `docs/plugin-integration.md` §2.3（health）/§2.4（status）
 // 为什么要有这个文件：宿主 genie 的六态适配器按固定字段名与 checks 数组校验；载荷形状不对
 // 时 graft 会被判成 installed-unavailable（面板谎报「已安装但不可用」）。
 //

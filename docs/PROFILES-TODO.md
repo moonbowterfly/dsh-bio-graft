@@ -43,7 +43,7 @@ ABE8e / ABE8.20（Richter 2020 Nat Biotechnol）、BE3 的窄窗变体（YE1/EE/
     master README 的 changelog 止于 2.3，且明确写 bulge 需独立包装脚本 `cas-offinder-bulge`。
     **在证实之前不改代码**（外部提出、无法证实的断言一律只入待评估清单）。
   - 无论版本如何，**v2.4.1 的「未检出」不可推出「无 bulge 脱靶」**——现状已用「bulge 请求响亮报错 +
-    `search_parameters.bulge: unsupported` + 边界声明」实现该纪律；批次 C 会再加 `search_completeness` 枚举字段。
+    `search_parameters.bulge: unsupported` + 边界声明」实现该纪律；`search_completeness` 枚举字段已实现。
 - **契约回归**：若上游发布新版本并被采用，必须重跑 `test/offtarget-scan.mjs` 夹具确认三段式 input /
   0-based 输出 / 设备语义未变。
 - **Cas-OFFinder 设备**：无 CPU OpenCL 设备的机器上（`C` 直接失败）只能 GPU（`device=auto` 已自动处理）。

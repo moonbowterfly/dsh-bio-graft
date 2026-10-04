@@ -1,6 +1,6 @@
 # dsh-bio-graft 架构
 
-> 更新：2026-09-14（批次 A 完成后）。
+> 更新：2026-09-14。
 
 ## 1. 定位与形态
 
@@ -31,9 +31,8 @@ graft 是 dsh 生态里的**感知式域插件**（hosted-domain extension）：
 GET /api/dsh-bio-graft/integration/health     # 静态：身份 + 协议版本 + features（不 spawn Python、不写盘）
 GET /api/dsh-bio-graft/integration/v1/status  # 运行时：state/checks/generatedAt/data/env/remediations
 ```
-> ⚠️ 当前载荷是**早期形状**（`plugin`/`protocol:{major,minors}`，`checks` 为对象而非数组）——
-> 与 `genie/docs/plugin-integration.md` v2 契约不一致，批次 B 对齐；在此之前宿主的六态适配器
-> 会把 graft 判为 `installed-unavailable`。
+> 载荷形状与 `genie/docs/plugin-integration.md` v2 契约一致（`pluginId` / `protocolMajor` /
+> `checks` 数组）；宿主六态适配器按固定字段校验。
 
 ## 2. 进程与状态模型
 
@@ -104,18 +103,19 @@ agent 工具调用
 | 工具/op 契约 | `test/tools-contract.mjs` | 工具集合、`additionalProperties`、tools.js↔graft_ops.py 的 op 双向存在性 |
 | 黄金 op | `test/golden-ops.mjs` | FASTA/多行输入、IUPAC PAM、cut_site 口径、账本序号单调/同名保护 |
 | 真实后端 | `test/offtarget-scan.mjs` | 真实 Cas-OFFinder：精确命中坐标、1-mismatch 错配位置、0 命中护栏、长度校验、缺基因组引导 |
-| 接入协议 | `test/integration-contract.mjs`（批次 B） | v2 载荷形状与 state 一致性 |
+| 接入协议 | `test/integration-contract.mjs` | v2 载荷形状与 state 一致性 |
 | 真实会话 | 真实 dsh 会话端到端 | agent 真会用（配对 tool/call 与 tool/result）、无自愈 |
-| 宿主适配器 | genie `scripts/test-graft-adapter.mjs`（批次 B） | 六态矩阵 + gem 零漂移 |
+| 宿主适配器 | genie `scripts/test-graft-adapter.mjs` | 六态矩阵 + gem 零漂移 |
 
 纪律：`GRAFT_STRICT=1` 下探针失败/跳过一律 FAIL（门不许静默跳过）。
 
-## 7. 扩展点（按批次）
+## 7. 扩展点（按里程碑）
 
-- **批次 B**：integration v2 载荷、`capabilities.json`、genie 域注册表/条件分页/persona 路由。
-- **批次 C**：`graft_rank`（声明式 policy + Pareto）、off-target per-guide 语义汇总（seed 区分布）、
+- **里程碑 B（已完成）**：integration v2 载荷、`capabilities.json`、genie 域注册表/条件分页/persona 路由。
+- **里程碑 C（已完成）**：`graft_rank`（声明式 policy + Pareto）、off-target per-guide 语义汇总（seed 区分布）、
   EditPlan 0.2 的 `ranking_policy`/`off_target_summary` 收口。
-- **批次 D**：`BaseEditorProfile` + `graft_base_edit`（窗口可编辑碱基/bystander/密码子后果）。
-- 之后（触发条件另议）：prime editing、CRISPRi/a + Cas13 designer、HDR 供体、编辑结果 ML 预测（provider 化）。
+- **里程碑 D（已完成）**：`BaseEditorProfile` + `graft_base_edit`（窗口可编辑碱基/bystander/密码子后果）。
+- **里程碑 E′/F（已完成）**：多 guide 策略（`graft_strategy`）、验证方案（`graft_validation_plan`）。
+- 后续候选（触发条件另议）：prime editing、CRISPRi/a + Cas13 designer、HDR 供体、编辑结果 ML 预测（provider 化）。
 
 **永不 bundle**：FlashFry（GPL-3+）、PrimeDesign（AGPL/商业）、inDelphi（非商业）、CRISPResso2（非商业学术 EULA）。
