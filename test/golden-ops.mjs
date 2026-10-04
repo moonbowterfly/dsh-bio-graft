@@ -3,7 +3,7 @@
 // 覆盖：FASTA/多行输入(D1) · Cas12a IUPAC PAM(D2) · cut_site 坐标口径(D5) · EditPlan 账本(D6)
 // 夹具设计：序列里只有一个 PAM 命中，且反链无命中 —— 期望值可手算。
 import { check, summary, op } from './harness.mjs'
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -33,6 +33,31 @@ check('FASTA input records the record id (D1)', fromFasta?.record_id === 'demo_c
 const fromRaw = op('guide_enumerate', { sequence: SPCAS9_TARGET, editor: 'SpCas9', top_n: 10 })
 check('FASTA input === raw input (identical candidates)',
   fromFasta !== null && JSON.stringify(fromFasta.candidates) === JSON.stringify(fromRaw.candidates))
+
+// ---------- 1b. 文件路径输入（D7）----------
+// 背景：agent 常把 FASTA 文件路径直接传给 sequence；修复前路径字符串被当序列清洗
+// → 静默产出 0 候选（无声错误结果）。修复：sequtil.resolve_sequence_input。
+// 注记：本段用 String.fromCharCode(10) 拼行，避免依赖源码中的转义字面量。
+const nl = String.fromCharCode(10)
+const pathDir = mkdtempSync(join(tmpdir(), 'graft-path-'))
+const fastaPath = join(pathDir, 'fixture.fasta')
+writeFileSync(fastaPath, '>demo_path synthetic' + nl + SPCAS9_TARGET + nl, 'utf8')
+const fromPath = op('guide_enumerate', { sequence: fastaPath, editor: 'SpCas9', top_n: 10 })
+check('file path input yields same candidates as raw (D7)',
+  JSON.stringify(fromPath.candidates) === JSON.stringify(fromRaw.candidates),
+  `n_candidates_raw=${fromPath.n_candidates_raw}`)
+check('file path input records the record id (D7)', fromPath.record_id === 'demo_path',
+  `record_id=${fromPath.record_id}`)
+let missingErr = null
+try {
+  op('guide_enumerate', { sequence: join(pathDir, 'missing.fasta'), editor: 'SpCas9', top_n: 5 })
+} catch (e) {
+  missingErr = e.message
+}
+check('missing file path rejected with clear message (D7)',
+  missingErr !== null && missingErr.indexOf('文件不存在') !== -1,
+  missingErr ? missingErr.slice(0, 160) : 'no error raised')
+rmSync(pathDir, { recursive: true, force: true })
 
 // ---------- 2. 多行裸序列 ----------
 const multiline = `${SPCAS9_TARGET.slice(0, 12)}\n${SPCAS9_TARGET.slice(12)}\n`

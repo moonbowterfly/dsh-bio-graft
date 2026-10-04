@@ -74,7 +74,7 @@ export function registerTools(ctx) {
       '敲除类实验必须剔除 template_hits>1 的候选（多位点切割）。' +
       '触发词：设计 sgRNA、找 guide、候选 sgRNA、编辑位点设计、crispr 设计、切割位点、敲除设计。',
     parameters: {
-      sequence: { type: 'string', required: true, description: '目标序列（FASTA 或裸 DNA；多行/多条 FASTA 均支持）' },
+      sequence: { type: 'string', required: true, description: '目标序列（FASTA / 裸 DNA / 文件路径；多行/多条 FASTA 均支持）' },
       editor: { type: 'string', description: '编辑酶名，如 SpCas9/Cas12a/SpG（默认 SpCas9；先用 graft_profiles 查）' },
       top_n: { type: 'number', description: '返回候选数上限（默认 100；n_candidates_raw 始终是截断前的真实数量）' },
       scan_both_strands: { type: 'boolean', description: '是否双链扫描（默认 true；false 只扫正链）' },
@@ -249,7 +249,7 @@ export function registerTools(ctx) {
       'cds_strand="-" 当前不支持）。' +
       '触发词：碱基编辑、CBE、ABE、C→T、A→G、bystander、点突变、无义突变、终止密码子、碱基编辑器。',
     parameters: {
-      sequence: { type: 'string', required: true, description: '目标序列（FASTA 或裸 DNA；编辑窗口按该序列的 + 链坐标报告）' },
+      sequence: { type: 'string', required: true, description: '目标序列（FASTA / 裸 DNA / 文件路径；编辑窗口按该序列的 + 链坐标报告）' },
       editor: { type: 'string', description: '碱基编辑器名（BE3 / BE4max / ABE7.10；默认 BE3；先用 graft_profiles 查）' },
       cds_start_0: { type: 'number', description: 'CDS 起点（0-based）；给了才算密码子后果（synonymous/missense/nonsense/stop_loss）' },
       cds_strand: { type: 'string', enum: ['+', '-'], description: 'CDS 所在链（默认 +；"-" 当前不支持密码子后果，会显式标注）' },
