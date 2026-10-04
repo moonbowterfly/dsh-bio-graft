@@ -44,7 +44,8 @@ from offtarget_interpret import (aggregate_per_guide, build_assessment,
 
 CAS_OFFINDER_URL = ('https://github.com/snugel/cas-offinder/releases/download/'
                     '2.4.1/cas-offinder_windows_x86-64.zip')  # x86-64（非 x86_64）
-graft_data_dir = os.path.expanduser('~/.dsh/dsh-bio-graft')
+graft_data_dir = os.path.join(
+    os.environ.get('DSH_HOME', os.path.expanduser('~/.dsh')), 'dsh-bio-graft')
 graft_bin_dir = os.path.join(graft_data_dir, 'bin')
 graft_tmp_dir = os.path.join(graft_data_dir, 'tmp')
 

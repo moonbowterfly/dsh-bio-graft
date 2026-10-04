@@ -8,6 +8,8 @@
 // ⚠️ editors 静态摘要与 python/editors.py 的**漂移**也在这里用真实 op 比对（单一事实源在 Python 侧）。
 import './register-dsh-tools.mjs'
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { check, summary, op } from './harness.mjs'
 import { captureRoutes, invokeRoute } from './fixtures/integration-route-harness.mjs'
 import { createIntegrationService, registerIntegrationRoutes, INTEGRATION_PREFIX,
@@ -80,6 +82,28 @@ check('no remediation is emitted for an ok check',
   v.checks.filter((c) => c.status === 'ok')
     .every((c) => !v.remediations.some((r) => r.detail.includes(c.id))))
 
+// 存在的非 Python 文件不能让状态误报 ok；新进程避免解释器选择缓存影响。
+const bogusPython = fileURLToPath(new URL('../package.json', import.meta.url))
+const selectionScript = `
+  import { pythonExe } from './src/python.js';
+  import { createIntegrationService } from './src/integration.js';
+  let actual = null;
+  try { actual = pythonExe() } catch {}
+  const status = (await createIntegrationService().status()).value;
+  console.log(JSON.stringify({ actual, reported: status.env.interpreter.selected,
+    check: status.checks.find(c => c.id === 'python.interpreter').status }));
+`
+const isolatedSelection = JSON.parse(execFileSync(process.execPath,
+  ['--input-type=module', '-e', selectionScript], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)),
+    env: { ...process.env, GRAFT_PYTHON: bogusPython }, encoding: 'utf8', timeout: 20_000,
+  }))
+check('status and execution skip an existing non-Python GRAFT_PYTHON',
+  isolatedSelection.actual !== bogusPython &&
+  isolatedSelection.reported === isolatedSelection.actual &&
+  isolatedSelection.check === (isolatedSelection.actual ? 'ok' : 'missing'),
+  JSON.stringify(isolatedSelection))
+
 // ---------- editors 静态摘要必须与 python/editors.py 一致（防漂移）----------
 const pyProfiles = op('profile_list', {})
 const pyByName = new Map(pyProfiles.editors.map((e) => [e.name, e]))
@@ -136,6 +160,18 @@ if (capabilitiesRoute) {
   const remote = await invokeRoute(capabilitiesRoute, { remoteAddress: '192.0.2.1' })
   check('remote GET /v1/capabilities is rejected',
     remote.statusCode === 403 && remote.body?.code === 'loopback-required')
+  const ipv6 = await invokeRoute(capabilitiesRoute, {
+    remoteAddress: '::1', headers: { host: '[::1]:19387', origin: 'http://[::1]:19387' },
+  })
+  check('IPv6 loopback with same-origin port is accepted', ipv6.statusCode === 200)
+  const crossPort = await invokeRoute(capabilitiesRoute, {
+    headers: { host: '127.0.0.1:19387', origin: 'http://127.0.0.1:19388' },
+  })
+  check('cross-port Origin is rejected', crossPort.statusCode === 403)
+  const badHost = await invokeRoute(capabilitiesRoute, {
+    headers: { host: 'localhost@evil.example:19387' },
+  })
+  check('Host with userinfo is rejected', badHost.statusCode === 403)
   const post = await invokeRoute(capabilitiesRoute, { method: 'POST' })
   check('POST /v1/capabilities is rejected',
     post.statusCode === 405 && post.body?.code === 'method-not-allowed')

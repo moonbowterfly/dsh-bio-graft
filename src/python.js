@@ -44,15 +44,11 @@ export function pythonCandidates() {
   return list
 }
 
-function candidates() {
-  return pythonCandidates().map((c) => c.path)
-}
-
 // graft v0.1 的核心 op 纯标准库；但为了 unifying 用户体验仍走 genie-hosted 优先
 function hasBaseline(exe) {
   try {
     const r = spawnSync(exe, ['-I', '-c', 'import json, re'], {
-      timeout: 15_000, windowsHide: true, stdio: 'ignore',
+      timeout: 2_000, windowsHide: true, stdio: 'ignore',
     })
     return r.status === 0
   } catch {
@@ -60,20 +56,36 @@ function hasBaseline(exe) {
   }
 }
 
-let cachedExe = null
+let cachedSelection = null
+let cachedSelectionAt = 0
+const SELECTION_CACHE_MS = 60_000
 
-export function pythonExe() {
-  if (cachedExe) return cachedExe
-  for (const c of candidates()) {
-    if (!c) continue
-    if (c !== 'python' && !existsSync(c)) continue
-    if (hasBaseline(c)) {
-      cachedExe = c
-      return c
+/** 状态端点与实际执行共享同一次验证，避免仅因文件存在而误报可用。 */
+export function pythonSelection() {
+  if (cachedSelection && Date.now() - cachedSelectionAt < SELECTION_CACHE_MS) return cachedSelection
+  const candidates = pythonCandidates().map((candidate) => ({
+    ...candidate,
+    exists: candidate.path === 'python' ? null : existsSync(candidate.path),
+    validated: false,
+  }))
+  let selected = null
+  for (const candidate of candidates) {
+    if (candidate.exists === false) continue
+    candidate.validated = hasBaseline(candidate.path)
+    if (candidate.validated) {
+      selected = candidate
+      break
     }
   }
-  cachedExe = 'python'
-  return cachedExe
+  cachedSelection = { selected, candidates }
+  cachedSelectionAt = Date.now()
+  return cachedSelection
+}
+
+export function pythonExe() {
+  const selected = pythonSelection().selected
+  if (!selected) throw new Error('no usable Python interpreter (set GRAFT_PYTHON or install Genie Python environment)')
+  return selected.path
 }
 
 /** graft v0.1 的 op 全部与工具同名（graft_<op>）。 */
@@ -94,7 +106,8 @@ export function stampProvenance(tool, value) {
 /** 调用 graft_ops.py（op 协议）：{op, args} -> result；异常/代码级失败抛 Error。 */
 export function callGraft(op, args, opts = {}) {
   return new Promise((resolve, reject) => {
-    const py = pythonExe()
+    let py
+    try { py = pythonExe() } catch (error) { reject(error); return }
     const script = join(PYTHON_DIR, 'graft_ops.py')
     const cp = spawn(py, ['-I', script], { cwd: PYTHON_DIR, windowsHide: true })
     let out = ''

@@ -12,10 +12,11 @@
  *
  * 本模块没有 import 期探测：加载插件与提供 /health 绝不 spawn 进程、不修改数据目录。
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import os from 'node:os'
-import { join } from 'node:path'
-import { pythonCandidates } from './python.js'
+import { delimiter, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { pythonSelection } from './python.js'
 import { PLUGIN_VERSION } from './version.js'
 import { EDITORS_SUMMARY } from './editors-summary.js'
 
@@ -68,8 +69,17 @@ function casOffinderProbe(dataRoot) {
   if (envPath && existsSync(envPath)) return { present: true, path: envPath, source: 'GRAFT_CAS_OFFINDER' }
   const local = join(dataRoot, 'bin', 'cas-offinder.exe')
   if (existsSync(local)) return { present: true, path: local, source: 'graft-bin' }
-  const sibling = join(process.cwd(), 'python', 'cas-offinder.exe')
-  if (existsSync(sibling)) return { present: true, path: sibling, source: 'plugin-python-dir' }
+  const exeName = process.platform === 'win32' ? 'cas-offinder.exe' : 'cas-offinder'
+  for (const dir of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
+    const path = join(dir, exeName)
+    try {
+      if (!statSync(path).isFile()) continue
+      if (process.platform !== 'win32') accessSync(path, constants.X_OK)
+      return { present: true, path, source: 'PATH' }
+    } catch { /* Python shutil.which skips this candidate too. */ }
+  }
+  const sibling = join(dirname(fileURLToPath(import.meta.url)), '..', 'python', 'cas-offinder.exe')
+  if (existsSync(sibling)) return { present: true, path: sibling, source: 'graft-python-dir' }
   return {
     present: false,
     path: null,
@@ -79,31 +89,22 @@ function casOffinderProbe(dataRoot) {
   }
 }
 
-/** 解释器候选链（与 src/python.js 同源；只做路径存在性判断，不 spawn）。 */
-function interpreterProbe() {
-  const candidates = pythonCandidates().map((c) => ({
-    path: c.path,
-    source: c.source,
-    exists: c.path === 'python' ? null : existsSync(c.path),
-  }))
-  const hosted = candidates.find((c) => c.exists === true)
-  const selected = hosted ?? candidates.find((c) => c.path === 'python') ?? null
-  return { selected, candidates }
-}
-
 function loopbackOnly(req) {
   const sa = req.socket?.remoteAddress ?? ''
   const loopbackIp = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(sa)
   if (!loopbackIp) return false
   try {
-    const host = (req.headers?.host ?? '').split(':')[0]
-    if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) return false
+    const hostHeader = req.headers?.host
+    if (typeof hostHeader !== 'string' || !hostHeader || /[\\/\s@?#]/.test(hostHeader)) return false
+    const hostUrl = new URL(`http://${hostHeader}`)
+    if (hostUrl.username || hostUrl.password || hostUrl.pathname !== '/') return false
+    if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostUrl.hostname)) return false
     const site = req.headers?.['sec-fetch-site']
     if (site && site === 'cross-site') return false
     const origin = req.headers?.origin
     if (origin) {
-      const oh = new URL(origin).hostname
-      if (oh !== host) return false
+      const originUrl = new URL(origin)
+      if (originUrl.protocol !== 'http:' || originUrl.origin !== hostUrl.origin) return false
     }
     return true
   } catch {
@@ -164,13 +165,12 @@ export function createIntegrationService() {
       const dataRootExists = existsSync(dataRoot)
       const plans = listFiles(plansDir, (n) => n.endsWith('.editplan.json'))
       const backend = casOffinderProbe(dataRoot)
-      const interp = interpreterProbe()
+      const interp = pythonSelection()
 
       const checks = [
         statusCheck(
           'python.interpreter',
-          interp.selected && interp.selected.exists === true ? 'ok'
-            : (interp.selected ? 'warn' : 'missing'),
+          interp.selected ? 'ok' : 'missing',
           interp.selected
             ? `${interp.selected.path}（source=${interp.selected.source}）`
             : '未找到可用解释器：设置 GRAFT_PYTHON，或让宿主 dsh-bio-genie 完成自举环境安装',
