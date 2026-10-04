@@ -22,9 +22,9 @@ const HARD_FILTER_EXAMPLE = JSON.stringify(RANK_CONTRACT.hardFilterExample)
 
 /** graft_ops 通用工具工厂（graft op 全部直接透传 JSON）。
  *
- * ⚠️ 传了自定义 `execute` 的工具必须走自己的实现——2026-09-14 真实会话实测：
- * 工厂无条件覆盖 execute 会让分支型工具（graft_backend_status 的 status/devices/ensure）
- * 永远落到 callGraft(undefined) → "unknown op: None"，而 agent 会把它当成工具故障去自愈。
+ * ⚠️ 传了自定义 `execute` 的工具必须走自己的实现——工厂无条件覆盖 execute 会让
+ * 分支型工具（graft_backend_status 的 status/devices/ensure）永远落到
+ * callGraft(undefined) → "unknown op: None"。
  */
 function graftTool(opts) {
   return defineTool({

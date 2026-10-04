@@ -154,7 +154,7 @@ try {
 }
 check('weighted without explicit weights fails loudly (no implicit weights)', noWeights)
 
-// ---------- ⑥ 脱靶摘要的两种形态都要认（真实会话：agent 手工合并时产出扁平形态）----------
+// ---------- ⑥ 脱靶摘要的两种形态都要认（实测：agent 手工合并时产出扁平形态）----------
 const flat = {
   protospacer: 'G'.repeat(20), pam: 'TGG', start_0: 1, end_0: 24, strand: '+',
   template_hits: 1,

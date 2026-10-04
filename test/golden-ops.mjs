@@ -103,7 +103,7 @@ try {
 check('unknown editor fails loudly', unknownEditorThrew)
 
 // ---------- 5b. 非 ASCII 参数必须原样往返（stdin/stdout 编解码契约）----------
-// 回归背景（2026-09-14 真实会话实测）：graft_ops.py 只把 stdout 切成 UTF-8，漏了 stdin
+// 回归背景（2026-09-14 实测）：graft_ops.py 只把 stdout 切成 UTF-8，漏了 stdin
 // → Windows 下按 GBK 误解码 agent 传来的 UTF-8 中文，得孤立代理项，写盘抛
 // UnicodeEncodeError: surrogates not allowed（实见 \udcab）→ 计划创建失败、agent 自愈。
 const CN = '中文诊断：含中文标点（括号）、分号；emoji 🧬 与全角空格　测试'

@@ -69,7 +69,7 @@ agent 工具调用
 | `python/offtarget.py` | Cas-OFFinder 后端（组装输入/设备选择/解析/体检） | 三段式 input；`interpretation_boundary` 恒在；0 命中必带排查提示 |
 | `python/plans.py` | EditPlan 资产 + append-only 账本 | run 号单调只增；原子写；同名不覆盖 |
 | `python/graft_ops.py` | JSON 协议分发器 | op 注册表是 TS 工具层的对端（契约测试双向校验） |
-| `src/tools.js` | 工具注册（7 个） | schema 里 object 型参数必须显式 `additionalProperties` |
+| `src/tools.js` | 工具注册（11 个） | schema 里 object 型参数必须显式 `additionalProperties` |
 | `src/python.js` | 解释器解析链 + 子进程调用 | 候选顺序：`GRAFT_PYTHON` → genie 自举环境 → `CONDA_PREFIX` → `PATH`（逐个探测可导入） |
 | `src/skills.js` | `graft-expert` 注册 | 必须带 `name/description/source/provider/content`（缺任一 → 引擎报 `source must be a string`） |
 | `src/integration.js` | integration API 路由 | loopback-only 守卫；health 不做昂贵探测 |
@@ -104,7 +104,7 @@ agent 工具调用
 | 黄金 op | `test/golden-ops.mjs` | FASTA/多行输入、IUPAC PAM、cut_site 口径、账本序号单调/同名保护 |
 | 真实后端 | `test/offtarget-scan.mjs` | 真实 Cas-OFFinder：精确命中坐标、1-mismatch 错配位置、0 命中护栏、长度校验、缺基因组引导 |
 | 接入协议 | `test/integration-contract.mjs` | v2 载荷形状与 state 一致性 |
-| 真实会话 | 真实 dsh 会话端到端 | agent 真会用（配对 tool/call 与 tool/result）、无自愈 |
+| 实测 | 真实 dsh 会话端到端 | agent 真会用（配对 tool/call 与 tool/result）、无自愈 |
 | 宿主适配器 | genie `scripts/test-graft-adapter.mjs` | 六态矩阵 + gem 零漂移 |
 
 纪律：`GRAFT_STRICT=1` 下探针失败/跳过一律 FAIL（门不许静默跳过）。

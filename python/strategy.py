@@ -186,7 +186,7 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
                     cl, cr = g['deleted_interval_0based_half_open']
                     # 「覆盖声明区段」= 两个切点**夹住**该区段（缺失区间 ⊇ 区段），
                     # 不是「切点落在区段内」（后者是子区间，反而删不掉区段两端）。
-                    # 真实会话实测：旧判据写反，导致工具返回的全是不覆盖区段的组合，
+                    # 实测：旧判据写反，导致工具返回的全是不覆盖区段的组合，
                     # agent 独立枚举后发现「工具评估集 ⊄ 我的覆盖集」。
                     covers = (cl <= region_start_0 and cr >= region_end_0)
                     pair['covers_declared_region'] = covers

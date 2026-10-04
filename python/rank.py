@@ -74,7 +74,7 @@ def _offtarget_mm(c: dict, k: int):
     """取某 mismatch 档的命中数。**两种形态都认**：
        嵌套 `offtarget_summary.hits_by_mismatch = {"0": n}`；
        扁平 `offtarget_summary.offtarget_mm0 = n` 或候选顶层 `offtarget_mm0 = n`。
-       （真实会话实测：agent 手工合并 graft_offtarget 输出时常产出扁平形态，
+       （实测：agent 手工合并 graft_offtarget 输出时常产出扁平形态，
        只认嵌套形态会把整批候选误判成 not_searched。）
        返回 None = 该数据确实没有（此时按 not_searched 处理）。"""
     ot = _offtarget(c)

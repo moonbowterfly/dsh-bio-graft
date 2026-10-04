@@ -4,7 +4,7 @@
 //   ① 注册的工具集合正好是文档化的 7 个；
 //   ② 所有 object 型参数都显式声明 additionalProperties（缺失会让 dsh 启动 UNSUPPORTED_SCHEMA）；
 //   ③ src/tools.js 里引用的每个 op（op: 'x' / callGraft('x')）都能在 python/graft_ops.py 的
-//      OPS 里找到 —— 防「注册了工具但 Python 未实现」这类只在真实会话里才暴露的静默失败。
+//      OPS 里找到 —— 防「注册了工具但 Python 未实现」这类只在实测里才暴露的静默失败。
 import './register-dsh-tools.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -99,7 +99,7 @@ check('graft_rank help uses canonical GC filter names from rank-contract.json',
   rankHelp.slice(0, 500))
 
 // ---------- 分支型工具必须真的走到自己的 execute ----------
-// 回归背景（2026-09-14 真实会话）：工具工厂无条件覆盖 execute，导致 graft_backend_status
+// 回归背景（2026-09-14）：工具工厂无条件覆盖 execute，导致 graft_backend_status
 // 的 status/devices/ensure 三个分支永远失效，落到 callGraft(undefined) → "unknown op: None"。
 const backendTool = registered.find((t) => t.name === 'graft_backend_status')
 check('graft_backend_status is registered', Boolean(backendTool))
