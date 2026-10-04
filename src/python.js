@@ -109,7 +109,7 @@ export function callGraft(op, args, opts = {}) {
     let py
     try { py = pythonExe() } catch (error) { reject(error); return }
     const script = join(PYTHON_DIR, 'graft_ops.py')
-    const cp = spawn(py, ['-I', script], { cwd: PYTHON_DIR, windowsHide: true })
+    const cp = spawn(py, ['-I', script], { cwd: opts.cwd || PYTHON_DIR, windowsHide: true })
     let out = ''
     let err = ''
     cp.stdout.on('data', (d) => { out += d })

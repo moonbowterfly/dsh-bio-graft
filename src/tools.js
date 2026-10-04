@@ -13,6 +13,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { readFileSync } from 'node:fs'
 import { callGraft } from './python.js'
+import { resolveWorkdir } from './workdir.js'
 
 const RANK_CONTRACT = JSON.parse(
   readFileSync(new URL('../rank-contract.json', import.meta.url), 'utf8'))
@@ -35,9 +36,9 @@ function graftTool(opts) {
       schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
     },
-    async execute(args) {
-      if (typeof opts.execute === 'function') return opts.execute(args)
-      return callGraft(opts.op, args, { timeoutMs: opts.timeoutMs ?? 120_000 })
+    async execute(args, exec) {
+      if (typeof opts.execute === 'function') return opts.execute(args, exec)
+      return callGraft(opts.op, args, { timeoutMs: opts.timeoutMs ?? 120_000, cwd: resolveWorkdir(exec) })
     },
   })
 }
@@ -149,14 +150,15 @@ export function registerTools(ctx) {
     parameters: {
       action: { type: 'string', enum: ['status', 'devices', 'ensure'], description: 'status=探测；devices=列设备；ensure=缺则自动下载安装' },
     },
-    async execute(args) {
+    async execute(args, exec) {
+      const cwd = resolveWorkdir(exec)
       if (args.action === 'ensure') {
-        return callGraft('offtarget_ensure', {}, { timeoutMs: 300_000 })
+        return callGraft('offtarget_ensure', {}, { timeoutMs: 300_000, cwd })
       }
       if (args.action === 'devices') {
-        return callGraft('offtarget_devices', {}, { timeoutMs: 60_000 })
+        return callGraft('offtarget_devices', {}, { timeoutMs: 60_000, cwd })
       }
-      return callGraft('offtarget_backend', args, { timeoutMs: 60_000 })
+      return callGraft('offtarget_backend', args, { timeoutMs: 60_000, cwd })
     },
   })))
 
