@@ -1,7 +1,7 @@
 // test/tools-contract.mjs — 工具注册契约（不依赖 dsh 引擎，用 mock loader 替换 @deepseek-ai/dsh-tools）
 //
 // 断言：
-//   ① 注册的工具集合正好是文档化的 7 个；
+//   ① 注册的工具集合与文档化清单一致（11 个）；
 //   ② 所有 object 型参数都显式声明 additionalProperties（缺失会让 dsh 启动 UNSUPPORTED_SCHEMA）；
 //   ③ src/tools.js 里引用的每个 op（op: 'x' / callGraft('x')）都能在 python/graft_ops.py 的
 //      OPS 里找到 —— 防「注册了工具但 Python 未实现」这类只在实测里才暴露的静默失败。
