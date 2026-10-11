@@ -21,6 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import copy as _copy
 
 _RANK_CONTRACT_PATH = Path(__file__).resolve().parent.parent / 'rank-contract.json'
 with _RANK_CONTRACT_PATH.open(encoding='utf-8') as _contract_file:
@@ -31,6 +32,49 @@ with _RANK_CONTRACT_PATH.open(encoding='utf-8') as _contract_file:
 
 def _scores(c: dict) -> dict:
     return (c.get('on_target_scores') or {}) if isinstance(c, dict) else {}
+
+
+def _cid(c: dict) -> str:
+    """候选无歧义内部键；旧对象不以 spacer 覆盖其他位点。"""
+    if isinstance(c, dict):
+        gid = c.get('guide_id')
+        if gid:
+            return gid
+        return c.get('record_key')
+    return str(c)
+
+
+def _prepare_candidates(candidates: list[dict]) -> list[dict]:
+    from guide_contract import assign_guide_identity
+    prepared = []
+    seen_ids = {}
+    legacy_counts = {}
+    for c in candidates:
+        out = _copy.deepcopy(c)
+        gid = out.get('guide_id')
+        if gid or out.get('identity_schema'):
+            out = assign_guide_identity(out)
+            gid = out['guide_id']
+            if gid in seen_ids and seen_ids[gid] != out:
+                raise ValueError(f'同一 guide_id 对应冲突候选: {gid}')
+            seen_ids[gid] = out
+            out['record_key'] = gid
+            out['identity_status'] = 'declared_checked'
+        else:
+            # 旧对象缺科学身份：位置/方向以及重复序号组成内部键，不生成 guide_id。
+            locus = [out.get('protospacer'), out.get('start_0'), out.get('end_0'),
+                     out.get('strand'), out.get('cut_site_0')]
+            canonical = json.dumps(locus, sort_keys=True, ensure_ascii=False)
+            ordinal = legacy_counts.get(canonical, 0)
+            legacy_counts[canonical] = ordinal + 1
+            out['record_key'] = 'legacy:' + hashlib.sha256(canonical.encode()).hexdigest()[:20] + f':{ordinal}'
+            out['identity_status'] = 'unresolved'
+        prepared.append(out)
+    return prepared
+
+
+def _display(c: dict) -> str:
+    return c.get('protospacer') or c.get('guide_id') or '(unnamed)'
 
 
 def _offtarget(c: dict) -> dict:
@@ -192,9 +236,10 @@ def _exclude_missing_metrics(candidates: list[dict], keys: list[str],
         if not missing:
             eligible.append(c)
             continue
-        label = c.get('protospacer') or c.get('guide') or '(unnamed)'
         excluded.append({
-            'protospacer': label,
+            'guide_id': c.get('guide_id'),
+            'record_key': _cid(c),
+            'protospacer': _display(c),
             'reasons': [
                 f'{key}=not_searched/missing data —— 无法参与 {policy} 排名'
                 f'（负证据语义：缺失 ≠ 通过）'
@@ -213,19 +258,27 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
     candidates = [c for c in candidates if isinstance(c, dict)]
     if not candidates:
         raise ValueError('candidates 里没有对象形态的候选')
+    candidates = _prepare_candidates(candidates)
 
     ranked_input: list[dict] = []
     excluded: list[dict] = []
     for c in candidates:
         reasons = _filter_candidate(c, hard_filters)
-        label = c.get('protospacer') or c.get('guide') or '(unnamed)'
         if reasons:
-            excluded.append({'protospacer': label, 'reasons': reasons})
+            excluded.append({'guide_id': c.get('guide_id'), 'record_key': _cid(c),
+                             'protospacer': _display(c),
+                             'reasons': reasons})
         else:
             ranked_input.append(c)
 
     def vector(c: dict, keys: list[str]) -> dict:
         return {k: METRICS[k][0](c) for k in keys}
+
+    # 完整候选 + rank 字段（GF-1：下游 strategy/plan 可直接消费，无需 agent 手工 merge）
+    def enrich(c: dict, **fields) -> dict:
+        out = _copy.deepcopy(c)
+        out.update(fields)
+        return out
 
     entries: list[dict] = []
     pareto_front: list[str] = []
@@ -245,7 +298,7 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
 
         ordered = sorted(eligible, key=sort_key)
         for i, c in enumerate(ordered, 1):
-            entries.append({'rank': i, 'protospacer': c.get('protospacer'), 'vector_values': vector(c, keys)})
+            entries.append(enrich(c, rank=i, vector_values=vector(c, keys)))
         policy_payload = {'policy': 'lexicographic', 'order': specs, 'hard_filters': hard_filters or {}}
 
     elif policy == 'pareto':
@@ -274,22 +327,21 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
 
         dom_map = {}
         for c in eligible:
-            doms = [o.get('protospacer') for o in eligible if o is not c and dominates(o, c)]
-            dom_map[c.get('protospacer')] = doms
-        front = [c.get('protospacer') for c in eligible if not dom_map.get(c.get('protospacer'))]
+            doms = [_cid(o) for o in eligible if o is not c and dominates(o, c)]
+            dom_map[_cid(c)] = doms
+        front = [_cid(c) for c in eligible if not dom_map.get(_cid(c))]
         pareto_front = front
         # 排序：先前沿，再按支配者数量少→多
         ordered = sorted(eligible,
-                         key=lambda c: (0 if c.get('protospacer') in front else 1,
-                                        len(dom_map.get(c.get('protospacer')) or [])))
+                         key=lambda c: (0 if _cid(c) in front else 1,
+                                        len(dom_map.get(_cid(c)) or [])))
         for i, c in enumerate(ordered, 1):
-            name = c.get('protospacer')
-            doms = dom_map.get(name) or []
-            entries.append({
-                'rank': i, 'protospacer': name, 'vector_values': vector(c, keys),
-                'pareto_rank': 1 if name in front else 1 + min(len(doms), 1),
-                'dominated_by': doms,
-            })
+            cid = _cid(c)
+            doms = dom_map.get(cid) or []
+            entries.append(enrich(
+                c, rank=i, vector_values=vector(c, keys),
+                pareto_rank=1 if cid in front else 1 + min(len(doms), 1),
+                dominated_by=doms))
         policy_payload = {'policy': 'pareto', 'objectives': specs, 'hard_filters': hard_filters or {}}
 
     elif policy == 'weighted':
@@ -314,9 +366,8 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
         enriched = [(c, *wvalue(c)) for c in eligible]
         enriched.sort(key=lambda t: t[1])
         for i, (c, val, missing) in enumerate(enriched, 1):
-            entry = {'rank': i, 'protospacer': c.get('protospacer'),
-                     'vector_values': vector(c, keys),
-                     'declared_objective_value': val}
+            entry = enrich(c, rank=i, vector_values=vector(c, keys),
+                           declared_objective_value=val)
             if missing:
                 entry['missing_metrics'] = missing
                 entry['missing_note'] = ('这些度量缺数据（not_searched），已按"不计入"处理；'
@@ -331,6 +382,8 @@ def rank_candidates(candidates: list, policy: str = 'pareto', order: list | None
         entries = entries[:int(top_n)]
 
     return {
+        'method_id': 'graft.declared_multiobjective_rank',
+        'method_version': 2,
         'policy': policy_payload,
         'policy_id': f"{policy_payload['policy']}:"
                      + ','.join(map(str, policy_payload.get('order') or policy_payload.get('objectives')

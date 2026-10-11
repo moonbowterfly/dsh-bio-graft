@@ -72,6 +72,51 @@ def _cut_of(c: dict):
     return c.get('cut_site_0')
 
 
+def _template_hash_of(c: dict):
+    """候选的模板身份（来自 identity_schema 或顶层）；旧对象无 → None。"""
+    if not isinstance(c, dict):
+        return None
+    return (c.get("identity_schema") or {}).get("template_seq_hash") \
+        or c.get("_template_seq_hash") or c.get("template_seq_hash")
+
+
+def _check_pair_template_compat(a: dict, b: dict, sequence=None):
+    """GF-3：配对前核对两条候选来自同一模板身份；提供 sequence 时再与实际解析 hash 核对。
+
+    返回 (ok, note)。不同模板/不可比较 GenomeContext → 拒绝配对（不能计算翻译）。"""
+    from guide_contract import template_seq_hash
+    from sequtil import clean_sequence
+    ha, hb = _template_hash_of(a), _template_hash_of(b)
+    issues = []
+    if ha and hb and ha != hb:
+        issues.append(f"两条候选模板身份不同：{ha} vs {hb}")
+    if sequence is not None:
+        parsed, _, n_records = clean_sequence(sequence)
+        if n_records != 1:
+            raise ValueError('sequence 必须仅有一条原始输入序列')
+        seq_hash = template_seq_hash(parsed)
+        if ha and ha != seq_hash:
+            issues.append(f"sequence 与候选模板身份冲突：sequence={seq_hash} candidate={ha}")
+        if hb and hb != seq_hash:
+            issues.append(f"sequence 与候选模板身份冲突：sequence={seq_hash} candidate={hb}")
+    ga, gb = a.get('genome_context'), b.get('genome_context')
+    if bool(ga) != bool(gb):
+        issues.append('候选 GenomeContext 有无不同')
+    if ga and gb:
+        fields = ('mode', 'assembly_accession', 'contig', 'region_start_0', 'region_end_0',
+                  'input_strand_relative_to_reference', 'input_sequence_hash')
+        if any(ga.get(k) != gb.get(k) for k in fields):
+            issues.append('候选 assembly/contig/region/方向/模板声明不同')
+        va, vb = ga.get('reference_verification') or {}, gb.get('reference_verification') or {}
+        if va.get('status') != vb.get('status'):
+            issues.append('候选实际参考核验状态不同')
+        if va.get('status') == 'verified' and va.get('record_seq_hash') != vb.get('record_seq_hash'):
+            issues.append('候选已核验 record 内容身份不同')
+    if issues:
+        return False, "; ".join(issues)
+    return True, None
+
+
 def _pair_geometry(a: dict, b: dict, *, cds_start_0: int | None = None) -> dict | None:
     """两条候选的几何关系 → 预测缺失区间/junction/移码。切点缺失时返回 None。"""
     ca, cb = _cut_of(a), _cut_of(b)
@@ -81,9 +126,11 @@ def _pair_geometry(a: dict, b: dict, *, cds_start_0: int | None = None) -> dict 
         a, b, ca, cb = b, a, cb, ca
     size = cb - ca
     return {
-        'left': {'protospacer': a.get('protospacer'), 'strand': a.get('strand'),
+        'left': {'guide_id': a.get('guide_id'), 'record_key': a.get('record_key'),
+                 'protospacer': a.get('protospacer'), 'strand': a.get('strand'),
                  'cut_site_0': ca, 'pam': a.get('pam')},
-        'right': {'protospacer': b.get('protospacer'), 'strand': b.get('strand'),
+        'right': {'guide_id': b.get('guide_id'), 'record_key': b.get('record_key'),
+                  'protospacer': b.get('protospacer'), 'strand': b.get('strand'),
                   'cut_site_0': cb, 'pam': b.get('pam')},
         'deleted_interval_0based_half_open': [ca, cb],
         'deleted_size_bp': size,
@@ -107,14 +154,17 @@ def _pair_geometry(a: dict, b: dict, *, cds_start_0: int | None = None) -> dict 
 
 def _pairwise_offtarget(a: dict, b: dict, *, window_bp: int = 10000, max_events: int = 20) -> dict:
     """两条 guide 的脱靶命中两两组合：同一染色体、间距在窗口内 → 可能共同造成缺失。"""
-    ha = (a.get('offtarget_hits') or (a.get('offtarget_summary') or {}).get('hits') or [])
-    hb = (b.get('offtarget_hits') or (b.get('offtarget_summary') or {}).get('hits') or [])
-    if not ha or not hb:
+    sa, sb = a.get('offtarget_summary') or {}, b.get('offtarget_summary') or {}
+    ha = a.get('offtarget_hits') or sa.get('hits') or []
+    hb = b.get('offtarget_hits') or sb.get('hits') or []
+    complete_a = sa.get('hit_details_complete', bool(ha))
+    complete_b = sb.get('hit_details_complete', bool(hb))
+    if not complete_a or not complete_b:
         missing = []
-        if not ha:
-            missing.append('left.no_offtarget_hits')
-        if not hb:
-            missing.append('right.no_offtarget_hits')
+        if not complete_a:
+            missing.append('left.hit_details_not_complete')
+        if not complete_b:
+            missing.append('right.hit_details_not_complete')
         return {'status': 'not_searched', 'missing': missing,
                 'note': '两条 guide 都需带 offtarget 命中数据（先跑 graft_offtarget 并把 hits 传进来）；'
                         '缺失即 not_searched，不得当「无风险」'}
@@ -141,9 +191,18 @@ def _pairwise_offtarget(a: dict, b: dict, *, window_bp: int = 10000, max_events:
 
 def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
                       region_start_0: int | None = None, region_end_0: int | None = None,
-                      cds_start_0: int | None = None, max_offset_bp: int = 200,
+                      cds_start_0: int | None = None, cds_end_0: int | None = None,
+                      cds_strand: str = '+', phase: int = 0, genetic_code=None,
+                      cds_complete: bool = True, cds_exon_count: int = 1,
+                      sequence: str | None = None,
+                      max_offset_bp: int = 200,
                       pairwise_window_bp: int = 10000, top_n: int = 20) -> dict:
-    """评估一个 EditStrategy 的候选组合（几何 + 组合事实；不做效率预测）。"""
+    """评估一个 EditStrategy 的候选组合（几何 + 组合事实；不做效率预测）。
+
+    GF-3 新增：sequence（原始输入模板）+ 完整 CDS 起止/strand/phase 时，为每个
+    deletion_pair 计算删除后翻译后果（frame_preserved_by_length /
+    premature_stop_detected / protein_length / translation_validation）。
+    未给 CDS：in_frame=null；仅旧 CDS 起点：保留几何 %3 + translation_computed=false。"""
     meta = STRATEGIES.get(strategy)
     if meta is None:
         raise ValueError(f'unknown strategy {strategy!r}；可用：{sorted(STRATEGIES)}')
@@ -159,6 +218,20 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
         }
     if not isinstance(candidates, list) or not candidates:
         raise ValueError('candidates 至少一条')
+    from guide_contract import assign_guide_identity
+    import copy
+    candidates = [copy.deepcopy(c) for c in candidates]
+    seen_ids = {}
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            raise ValueError('strategy candidates 必须是对象')
+        if candidate.get('guide_id') or candidate.get('identity_schema'):
+            checked = assign_guide_identity(candidate)
+            gid = checked['guide_id']
+            if gid in seen_ids and seen_ids[gid] != checked:
+                raise ValueError(f'同一 guide_id 对应冲突候选: {gid}')
+            seen_ids[gid] = checked
+            candidates[index] = checked
 
     if strategy == 'single_cut':
         return {'strategy': strategy, 'implemented': True, 'verdict': 'use_design_tools',
@@ -166,9 +239,20 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
     if len(candidates) < 2:
         raise ValueError('candidates 至少两条（策略评估需要组合）')
 
+    has_full_cds = (sequence is not None and cds_start_0 is not None
+                    and cds_end_0 is not None and cds_end_0 > cds_start_0)
+    from sequtil import simulate_deletion_translation
+
     pairs = []
+    n_pair_identity_rejected = 0
     for i in range(len(candidates)):
         for j in range(i + 1, len(candidates)):
+            # GF-3：同一模板身份 + 可比较 GenomeContext 才配对
+            ok_tmpl, tmpl_note = _check_pair_template_compat(
+                candidates[i], candidates[j], sequence=sequence)
+            if not ok_tmpl:
+                n_pair_identity_rejected += 1
+                continue
             g = _pair_geometry(candidates[i], candidates[j], cds_start_0=cds_start_0)
             if g is None:
                 continue
@@ -184,10 +268,6 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
             elif strategy == 'deletion_pair':
                 if region_start_0 is not None and region_end_0 is not None:
                     cl, cr = g['deleted_interval_0based_half_open']
-                    # 「覆盖声明区段」= 两个切点**夹住**该区段（缺失区间 ⊇ 区段），
-                    # 不是「切点落在区段内」（后者是子区间，反而删不掉区段两端）。
-                    # 实测：旧判据写反，导致工具返回的全是不覆盖区段的组合，
-                    # agent 独立枚举后发现「工具评估集 ⊄ 我的覆盖集」。
                     covers = (cl <= region_start_0 and cr >= region_end_0)
                     pair['covers_declared_region'] = covers
                     if covers:
@@ -198,6 +278,24 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
                             f"切点区间 [{cl}, {cr}) 未夹住声明区段 "
                             f"[{region_start_0}, {region_end_0})：两端各需 cut_left ≤ 起点、"
                             f"cut_right ≥ 终点")
+                # GF-3：删除后翻译验证
+                cl, cr = g['deleted_interval_0based_half_open']
+                if sequence is not None and cds_end_0 is not None and cds_end_0 > (cds_start_0 or 0):
+                    pair['translation'] = simulate_deletion_translation(
+                        sequence, cl, cr, cds_start_0, cds_end_0,
+                        cds_strand=cds_strand, phase=phase, genetic_code=genetic_code,
+                        cds_complete=cds_complete, cds_exon_count=cds_exon_count)
+                    pair['translation_template_identity_ok'] = bool(
+                        _template_hash_of(candidates[i]) and _template_hash_of(candidates[j])) or None
+                    if pair['translation'].get('translation_computed'):
+                        pair['in_frame'] = pair['translation']['cds_frame_preserved']
+                else:
+                    # 未给 CDS → in_frame=null；仅旧起点 → 保留几何 %3 + 未计算
+                    pair['translation'] = {"translation_computed": False}
+                    pair['translation_template_identity_ok'] = None
+                    if cds_start_0 is not None and cds_end_0 is None:
+                        pair['translation']['applicability_note'] = (
+                            "仅提供 CDS 起点——保留几何 %3（in_frame），翻译未计算")
             pairs.append(pair)
 
     n_not_covering = 0
@@ -211,18 +309,25 @@ def evaluate_strategy(candidates: list, strategy: str = 'deletion_pair', *,
         pairs.sort(key=lambda p: p.get('nickase_offset_bp', p['deleted_size_bp']))
 
     return {
+        'method_id': 'graft.edit_strategy_geometry',
+        'method_version': 2,
         'strategy': strategy,
         'implemented': True,
         'zh': meta['zh'],
         'n_candidates': len(candidates),
         'n_pairs_evaluated': len(pairs),
         'n_pairs_rejected_not_covering': n_not_covering,
+        'n_pairs_rejected_template_identity': n_pair_identity_rejected,
         'pairs': pairs[:int(top_n)],
         'pairs_truncated': len(pairs) > int(top_n),
         'geometry_only': ('本工具只给几何与组合事实：缺失长度/连接点/移码/PAM 朝向/两两脱靶组合。'
                           '缺失效率、配对切口酶的特异性提升幅度等属实验问题，不预测。'),
+        'translation_note': ('translation 字段（GF-3）只回答删除后 CDS 的翻译后果；'
+                             'frame_preserved_by_length %3==0 不保证蛋白完整/功能保持，'
+                             '以 premature_stop_detected 与 protein_length 为准。'),
         'pairwise_rule': PAIRWISE_NOTE,
         'declared_region': ([region_start_0, region_end_0]
                             if region_start_0 is not None and region_end_0 is not None else None),
-        'coordinate_note': '所有坐标均为参考序列 + 链的 0-based 半开区间；cut_site_0 来自候选自身。',
+        'coordinate_note': 'start_0/end_0/cut_site_0 与 CDS 参数均在原始输入序列 frame；'
+                           'genomic_* 才是参考正链坐标；删除区间为 input frame 的 0-based 半开区间。',
     }

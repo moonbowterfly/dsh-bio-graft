@@ -110,6 +110,7 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
                 risk_flags: list | None = None,
                 ranking_policy: dict | None = None,
                 off_target_summary: dict | None = None,
+                strategy_result: dict | None = None,
                 plan_dir: str | None = None,
                 action: str = 'new',
                 overwrite: bool = False,
@@ -147,6 +148,7 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
             'selected_candidate': None,
             'ranking_policy': ranking_policy or {},
             'off_target_summary': off_target_summary or {},
+            'strategy_result': strategy_result or {},
             'coordinate_systems': COORDINATE_SYSTEMS,
             'validation_plan': validation_plan or {},
             'provenance': {'created_at': ts, **(provenance or {})},
@@ -179,8 +181,10 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
             entry['ranking_policy'] = ranking_policy
         if off_target_summary is not None:
             entry['off_target_summary'] = off_target_summary
+        if strategy_result is not None:
+            entry['strategy_result'] = strategy_result
         content_keys = ('entries', 'validation_plan', 'reference', 'editor_profile',
-                        'risk_flags', 'ranking_policy', 'off_target_summary')
+                        'risk_flags', 'ranking_policy', 'off_target_summary', 'strategy_result')
         if not any(k in entry for k in content_keys) and not entry['provenance']:
             raise ValueError('add_run 至少要传一个待记录字段（candidates/validation_plan/'
                              'reference/editor_profile/risk_flags/ranking_policy/'
@@ -201,6 +205,9 @@ def plan_create(plan_name: str, intent: dict | None = None, reference: dict | No
         if off_target_summary is not None:
             plan['off_target_summary'] = off_target_summary
             entry['off_target_summary'] = off_target_summary
+        if strategy_result is not None:
+            plan['strategy_result'] = strategy_result
+            entry['strategy_result'] = strategy_result
         plan.setdefault('history', []).append({'ts': ts, 'event': 'recommendation updated'})
         entry['updated'] = True
 

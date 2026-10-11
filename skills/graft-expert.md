@@ -23,11 +23,16 @@ language: python
 
 ```
 TARGET    明确编辑目标（序列/坐标/物种/组装版本/编辑意图 desired_change）
-DESIGN    graft_profiles 先看编辑酶 → graft_design 枚举候选 → graft_score 评分向量
+DESIGN    graft_profiles 先看编辑酶 → graft_design(sequence, genome_context, reference_file) 实际核验并枚举
+          → graft_score 评分向量 → graft_offtarget(candidates=评分候选) 实际搜索
 RANK      用 **graft_rank** 按声明策略排名（pareto / lexicographic / 显式 weighted）——
+          直接传 graft_offtarget.enriched_candidates，不按 spacer 手工合并结果；
           排序必须由工具完成并输出 policy_id + policy_digest，再用
           graft_plan_save(action=update_recommendation, ranking_policy=<policy 载荷>) 落账本；
-          排序解释要保留证据：「B 的活性略高但 D 的脱靶更低，按本 objective 推荐 D」
+          排序解释要保留实际度量；规则 GC/同聚物评分不得称活性预测
+STRATEGY  graft_strategy(candidates=ranked, sequence=原输入, cds_start_0, cds_end_0,
+          cds_strand, phase=0, genetic_code="standard")；各坐标均属 input frame，
+          不以 genomic strand 代替 CDS strand；结果随 graft_plan_save(strategy_result) 保存
 VERIFY    **graft_validation_plan** 生成分档验证要求（required/recommended/conditional + 指标定义）
           再用 graft_plan_save(action=add_run) 记进账本
 AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B 今天 D」
@@ -55,13 +60,13 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
 | 工具 | 说明 |
 |---|---|
 | `graft_profiles` | 列出内置 NucleaseProfile（PAM/geometry/scoring 文献引用） |
-| `graft_design` | sgRNA 枚举 + 评分向量（不打综合分） |
+| `graft_design` | sgRNA 枚举；给完整 genomic context 与 `reference_file` 时才实际读取参考并标 verified，assembly accession 仍是 caller 声明 |
 | `graft_score` | 单独对候选列表打分（复用） |
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-显式权重）；返回 policy_id + policy_digest + 被剔除原因；负证据语义（数据缺失=not_searched，绝不静默通过） |
 | `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + bystander + 密码子后果；只做几何不预测活性；链语义三件套（反链 C→T = 参考正链 G→A） |
 | `graft_strategy` | **多 guide 策略**（deletion_pair / paired_nickase）：预测缺失区间/长度/连接点/移码 + **pairwise 脱靶组合**（风险不相加）；未实现策略显式拒绝 |
 | `graft_validation_plan` | **验证方案**：按模态+宿主分档（required 不可删）+ 指标带分子/分母/assay + `cannot_conclude`；植物加嵌合/合子性/可遗传 |
-| `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3，需用户准备 genome FASTA + 模式文件） |
+| `graft_offtarget` | Cas-OFFinder 脱靶扫描（BSD-3）；传原样 candidates 自动查询并返回 `enriched_candidates`，每位点保留完整身份、全量计数与展示截断，未搜索维度仍为 not_searched |
 | `graft_backend_status` | 后端探测/ensure 安装 Cas-OFFinder |
 | `graft_plan_save` | EditPlan 写入（new/add_run/update_recommendation） |
 | `graft_plan_load` | EditPlan 读回（plan + 全部 runs） |
@@ -84,6 +89,12 @@ AUDIT     graft_plan_load 的 runs/ 时间线可回答「为什么昨天排名 B
    会剔除并说明；agent 引用时也必须把缺失讲清楚。
 3. **所有修改走 graft_plan_save 追加 run**，不覆盖——可审计。
 4. **关键参数必须由工具输出，不要心算**——gc/坐标全部来自 graft_design。
+4a. **参考状态与位点身份**：caller 自报 verified 不作数；没有实际参考文件时为 unverified。
+    参考 FASTA 的 record ID 必须与 genome_context.contig 精确一致；file byte hash、record sequence hash、
+    模板 hash 分开报告。同序列不同位点即使 spacer 相同，也不可合并成一个候选。
+4b. **翻译适用边界**：仅完整单外显子 phase0 标准密码 CDS 的正反链。完整 CDS 内及完全上游/下游
+    删除可计算；跨 CDS 边界或不整三的原 CDS 返回 not_supported。`frame_preserved_by_length` 只是几何事实，
+    仍需检查实际 CDS frame、premature stop 与去 terminal stop 的蛋白长度。
 5. **风险分级门控**（risk_context，写在 EditPlan.risk_flags）：
    - **Level 0 科研常规**（非致病微生物/细胞系/模式生物/基础研究）→ 正常提供设计
    - **Level 1 人类 somatic 研究** → 可做设计/比较/脱靶评估，但必须加

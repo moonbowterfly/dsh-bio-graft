@@ -233,6 +233,26 @@ if (!BACKEND?.ok || !BIN || !existsSync(BIN)) {
     truncPg.length === 2 && truncPg.every((g) => g.n_hits >= 1),
     JSON.stringify(truncPg.map((g) => ({ q: g.query, n: g.n_hits }))))
 
+  const duplicateSites = op('offtarget_scan', {
+    genome_file: genomeNative,
+    candidates: [
+      { protospacer: GUIDE, pam: 'AGG', start_0: 1, strand: '+' },
+      { protospacer: GUIDE, pam: 'AGG', start_0: 101, strand: '-' },
+    ],
+    editor: 'SpCas9', mismatches: 1, device: 'auto', top_n: 100,
+    workdir: dir, output: join(dir, 'duplicate-sites.txt'),
+  }, { timeoutMs: 300_000 })
+  check('same query searches once and enriches both distinct candidate sites',
+    duplicateSites.search_parameters?.n_queries === 1 &&
+    duplicateSites.search_parameters?.n_candidate_sites === 2 &&
+    duplicateSites.enriched_candidates?.length === 2 &&
+    duplicateSites.enriched_candidates[0].start_0 === 1 &&
+    duplicateSites.enriched_candidates[1].start_0 === 101 &&
+    duplicateSites.enriched_candidates.every((c) =>
+      c.offtarget_summary?.total === duplicateSites.per_guide[0].n_hits),
+    JSON.stringify({ params: duplicateSites.search_parameters,
+      sites: duplicateSites.enriched_candidates?.map((c) => c.start_0) }))
+
   // ---------- ③ 假阴性护栏：0 命中必须带排查提示 ----------
   const empty = op('offtarget_scan', {
     genome_file: genomeNative,
@@ -257,14 +277,16 @@ if (!BACKEND?.ok || !BIN || !existsSync(BIN)) {
   check('query/pattern length mismatch fails loudly', lenMismatchThrew)
 
   // ---------- ⑤ 基因组不存在时的引导 ----------
-  const missing = op('offtarget_scan', {
-    genome_file: join(dir, 'nope.fa').replace(/\\/g, '/'),
-    queries: [`${GUIDE}AGG`], pattern: 'N20NGG',
-  })
-  check('missing genome returns preflight failure with hint',
-    missing.ok === false && missing.genome_check?.exists === false &&
-    typeof missing.hint === 'string',
-    JSON.stringify(missing.error))
+  let missingError = null
+  try {
+    op('offtarget_scan', {
+      genome_file: join(dir, 'nope.fa').replace(/\\/g, '/'),
+      queries: [`${GUIDE}AGG`], pattern: 'N20NGG',
+    })
+  } catch (e) { missingError = e.message }
+  check('missing genome is a top-level JSON bridge failure',
+    /ok:false/.test(missingError ?? '') && /genome preflight failed/.test(missingError ?? ''),
+    String(missingError))
 }
 
 summary('offtarget-scan')

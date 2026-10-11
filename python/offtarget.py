@@ -126,6 +126,18 @@ def list_devices(exe: str, timeout: int = 30) -> list[dict]:
     return devices
 
 
+def probe_backend_version(exe: str) -> str | None:
+    """读取当前实际 Cas-OFFinder 二进制自报版本，不由文件名推定。"""
+    try:
+        proc = subprocess.run([exe], capture_output=True, text=True, timeout=30,
+                              encoding='utf-8', errors='replace')
+    except Exception:
+        return None
+    match = re.search(r'Cas-OFFinder\s+v([0-9]+(?:\.[0-9]+)+)',
+                      (proc.stdout or '') + (proc.stderr or ''), re.I)
+    return match.group(1) if match else None
+
+
 def pick_device(exe: str, requested: str = 'auto') -> tuple[str, list[dict], str]:
     """选设备：显式请求优先；auto = 先 CPU（确定性）再按 ID 取 GPU。
 
@@ -323,6 +335,7 @@ def _parse_hits(path: str) -> list[dict]:
             hits.append({
                 'query': query,
                 'chromosome': chrom,
+                'chromosome_id': chrom.split()[0],
                 'position_0based': pos0,
                 'position_1based': pos0 + 1,
                 'matched_sequence': matched,
@@ -352,7 +365,7 @@ def queries_from_candidates(candidates: list, editor: str = 'SpCas9') -> tuple[l
         spacer = spacer.upper()
         pam = pam.upper()
         if not spacer:
-            continue
+            raise ValueError('candidate 缺 protospacer')
         if not pam:
             raise ValueError(f'candidate {spacer[:12]}… 缺 pam 字段——'
                              f'请传 graft_design 的原样输出，或用 queries 显式给出序列')
@@ -366,6 +379,58 @@ def queries_from_candidates(candidates: list, editor: str = 'SpCas9') -> tuple[l
                if profile.pam_side == '3prime'
                else (profile.pam_pattern + 'N' * profile.spacer_length))
     return queries, pattern
+
+
+def enrich_candidates(candidates: list, queries: list[str], hits_all: list[dict],
+                      shown_hits: list[dict], per_guide: list[dict],
+                      search_completeness: dict, genome_file: str) -> list[dict]:
+    """把一次真实搜索事实按 query 回填每个位点，保留各自 guide 身份与 intended-site。"""
+    import copy
+    import hashlib
+    from guide_contract import assign_guide_identity
+    genome_hash = None
+    if os.path.isfile(genome_file):
+        digest = hashlib.sha256()
+        with open(genome_file, 'rb') as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b''):
+                digest.update(block)
+        genome_hash = 'sha256:' + digest.hexdigest()
+    summaries = {row['query']: row for row in per_guide}
+    enriched = []
+    for candidate, query in zip(candidates, queries, strict=True):
+        out = copy.deepcopy(candidate)
+        if out.get('guide_id') or out.get('identity_schema'):
+            out = assign_guide_identity(out)
+        all_qhits = [h for h in hits_all if h['query'] == query]
+        shown_qhits = [h for h in shown_hits if h['query'] == query]
+        gc = out.get('genome_context') or {}
+        verification = gc.get('reference_verification') or {}
+        same_reference = (verification.get('status') == 'verified' and
+                          genome_hash is not None and
+                          genome_hash == verification.get('file_byte_hash'))
+        intended = [h for h in all_qhits if same_reference and
+                    h.get('chromosome_id') == gc.get('contig') and
+                    h.get('position_0based') == out.get('genomic_start_0') and
+                    h.get('strand') == out.get('genomic_strand') and
+                    h.get('mismatches') == 0]
+        row = summaries[query]
+        out['offtarget_summary'] = {
+            'status': 'searched', 'query': query,
+            'total': row['n_hits'], 'hits_by_mismatch': row['hits_by_mismatch'],
+            'seed_region_hits': row['seed_region_hits'],
+            'exact_match_present': row['exact_match_present'],
+            'nearest_site': row['nearest_site'],
+            'search_completeness': copy.deepcopy(search_completeness),
+            'hits': copy.deepcopy(shown_qhits),
+            'hit_details_complete': len(shown_qhits) == len(all_qhits),
+            'hits_truncated': len(shown_qhits) < len(all_qhits),
+            'intended_site_status': ('same_reference_exact_locus_checked' if same_reference
+                                     else 'not_verified_against_search_genome'),
+            'intended_site_match_count': len(intended) if same_reference else None,
+            'search_genome_byte_hash': genome_hash,
+        }
+        enriched.append(out)
+    return enriched
 
 
 def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
@@ -399,6 +464,8 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
     if candidates:
         from editors import get_editor  # 同目录模块（脚本目录由 graft_ops 注入 sys.path）
         queries, derived_pattern = queries_from_candidates(candidates, editor)
+        candidate_queries = queries
+        queries = list(dict.fromkeys(queries))  # 同 query 搜索一次，事实按各位点回填
         pattern = pattern or derived_pattern
         pam_side = get_editor(editor).pam_side   # seed 窗口方向随编辑器而定
     if not queries:
@@ -442,16 +509,21 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
     hits_all = _parse_hits(tmp_out)
     truncated = len(hits_all) > top_n
     hits = hits_all[:top_n] if truncated else hits_all
+    per_guide = aggregate_per_guide(hits_all, queries, seed_length=seed_length,
+                                    pam_side=pam_side)
+    search_completeness = build_search_completeness(mismatch_searched=True)
     result = {
         'ok': True,
         'mode': 'scan',
-        'backend': {'path': exe, 'source': exe_info.get('source')},
+        'backend': {'path': exe, 'source': exe_info.get('source'),
+                    'version_probe': probe_backend_version(exe)},
+        'method_id': 'graft.casoffinder_mismatch_search',
+        'method_version': 2,
         # ── 语义层：只给 observation，不给结论 ────────────────────────────────
-        'search_completeness': build_search_completeness(mismatch_searched=True),
+        'search_completeness': search_completeness,
         'assessment': build_assessment(),
         # per_guide 统计基于**全量**命中（hits_all）——top_n 截断只作用于返回列表
-        'per_guide': aggregate_per_guide(hits_all, queries, seed_length=seed_length,
-                                         pam_side=pam_side),
+        'per_guide': per_guide,
         'search_parameters': {
             'genome_file': genome_file.replace('\\', '/'),
             'genome_size_bytes': genome_check.get('size_bytes'),
@@ -475,6 +547,11 @@ def casoffinder_scan(genome_file: str, *, queries: list[str] | None = None,
     }
     if not hits_all:
         result['zero_hit_warning'] = ZERO_HIT_WARNING
+    if candidates:
+        result['enriched_candidates'] = enrich_candidates(
+            candidates, candidate_queries, hits_all, hits, per_guide,
+            search_completeness, genome_file)
+        result['search_parameters']['n_candidate_sites'] = len(candidates)
     if any(h['mismatches'] == 0 for h in hits_all):
         result['notes'] = [f"命中中含 {sum(1 for h in hits_all if h['mismatches'] == 0)} 条"
                            f"**完全匹配**位点（0 mismatch）——注意这可能包含设计靶点本身，"

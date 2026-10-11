@@ -100,6 +100,11 @@ def main() -> int:
             print(json.dumps({'ok': False, 'error': f'unknown op: {op}'}, ensure_ascii=False))
             return 0
         result = OPS[op](args)
+        if isinstance(result, dict) and result.get('ok') is False:
+            print(json.dumps({'ok': False, 'code': f'{op.upper()}_FAILED',
+                              'error': result.get('error', f'{op} failed'),
+                              'details': _sanitize_json(result)}, ensure_ascii=False))
+            return 0
         print(json.dumps({'ok': True, 'result': _sanitize_json(result)}, ensure_ascii=False))
     except KeyError as e:
         print(json.dumps({'ok': False,
@@ -107,7 +112,8 @@ def main() -> int:
                          ensure_ascii=False))
     except Exception as e:
         # 恒 ok:true 由桥契约约束——但 op 层失败我们 **显式** ok:false（代码级失败走 stderr traceback）
-        print(json.dumps({'ok': False, 'error': f'{type(e).__name__}: {e}'}, ensure_ascii=False))
+        print(json.dumps({'ok': False, 'code': 'INVALID_INPUT',
+                          'error': f'{type(e).__name__}: {e}'}, ensure_ascii=False))
         raise  # 让 traceback 进 stderr → TS 层 needs_repair=true
     return 0
 

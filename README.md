@@ -68,10 +68,10 @@ N 缺口 / bulge 未启用）。只可说「在当前搜索参数下未检出高
 | 工具 | 说明 |
 |---|---|
 | `graft_profiles` | 内置 NucleaseProfile 注册表（PAM/spacer/几何 + `verified`/`pam_source` 证据分级） |
-| `graft_design` | PAM 双向扫描枚举 sgRNA + 评分向量 + **切割位点**（IUPAC 感知；FASTA/裸序列/多条 FASTA） |
+| `graft_design` | PAM 双向扫描枚举 sgRNA + **切割位点**；可给 `genome_context` 与 `reference_file` 实际核验 FASTA 位点（无参考为 unverified） |
 | `graft_score` | 对已有候选补打评分向量（不打综合分） |
 | `graft_rank` | **声明式排名**（pareto / lexicographic / weighted-须显式权重）：输出 `policy_id`+`policy_digest`，被剔除候选带原因，缺数据按 `not_searched` 处理 |
-| `graft_offtarget` | Cas-OFFinder 批量脱靶扫描 → **结构化命中** + `search_completeness`（枚举没搜的维度）+ `assessment`（拒绝安全结论）+ `per_guide` 汇总；支持 `preflight_only` 基因组体检、`device=auto` |
+| `graft_offtarget` | Cas-OFFinder 批量脱靶扫描 → **结构化命中** + `search_completeness` + `per_guide`；传候选时返回带完整 guide 身份和全量计数的 `enriched_candidates`，可直接排名/制定策略；支持 `preflight_only`、`device=auto` |
 | `graft_base_edit` | **碱基编辑设计**（CBE/ABE）：窗口内可编辑碱基 + **bystander** + 密码子后果（synonymous/missense/nonsense/stop_loss）；链语义三件套（反链 C→T 在参考正链上是 G→A）；五层 profile 带 `window_evidence` |
 | `graft_strategy` | **多 guide 策略评估**（几何 + 组合事实）：`deletion_pair`（预测缺失区间/长度/连接点/移码）、`paired_nickase`（异链 + 间距）；每对候选附 **pairwise 脱靶组合**（不是风险相加；缺数据=not_searched）；未实现策略（prime_edit/hdr/multiplex）显式拒绝 |
 | `graft_validation_plan` | **验证方案**：按模态 + 宿主分档（required/recommended/conditional）+ **EditOutcomeMetrics**（每个指标带分子/分母/assay，禁止裸「efficiency」）+ `cannot_conclude`；植物额外要求嵌合/合子性/可遗传性；引物交接给 genie |

@@ -81,6 +81,8 @@ export function registerTools(ctx) {
       scan_both_strands: { type: 'boolean', description: '是否双链扫描（默认 true；false 只扫正链）' },
       record: { type: 'number', description: '多条 FASTA 时取第几条（0-based，默认 0）' },
       position_base: { type: 'string', enum: ['0', '1'], description: '报告用的坐标体系（默认 1；start_0/end_0 字段始终 0-based）' },
+      genome_context: { type: 'object', additionalProperties: true, description: '（可选）genomic 模式：{mode:"genomic", assembly_accession, contig, region_start_0, region_end_0, input_strand_relative_to_reference:"+|-", input_sequence_length, input_sequence_hash}；为每条候选补 genomic_* 坐标与 genomic_strand。缺字段即报错（不假定起点0/正链/默认assembly）。省略则 local 模式' },
+      reference_file: { type: 'string', description: '实际参考 FASTA 路径；与 genome_context.contig 的 record ID 精确匹配并比对区段。只有真实读取并匹配后才返回 verified；无参考保持 unverified' },
     },
     op: 'guide_enumerate',
   })))
@@ -115,6 +117,7 @@ export function registerTools(ctx) {
       '「没搜」≠「搜了没命中」）；② assessment.safety_conclusion 恒为 not_supported' +
       '（API 里不存在 safe:true / risk_level，禁词清单见 forbidden_phrasing）；' +
       '③ per_guide——每条 query 的命中数/mismatch 分布/seed 区命中数/最近位点/是否含精确匹配。' +
+      '传 candidates 时额外返回 enriched_candidates：完整候选和 guide_id 原样保留，每个位点按 query 回填全量计数、展示截断、intended-site 核验状态；直接传给 graft_rank/strategy/plan_save。' +
       'preflight_only=true 时只做基因组体检（记录数/总 bp/N 比例/是否 CRLF）不扫描——' +
       '**长扫描前建议先 preflight**。device 默认 auto（机器上没有 CPU OpenCL 设备时会自动改用 GPU 并回显实际设备）。' +
       '⚠️ **铁律：本工具的结果不能得出「安全」/「无脱靶」结论**——只能说' +
@@ -133,6 +136,7 @@ export function registerTools(ctx) {
       top_n: { type: 'number', description: '最多返回命中数（默认 200；超出置 hits_truncated=true）' },
       preflight_only: { type: 'boolean', description: 'true=只做基因组体检不扫描（默认 false）' },
       output: { type: 'string', description: '命中原始输出路径（缺省写 ~/.dsh/dsh-bio-graft/tmp/）' },
+      workdir: { type: 'string', description: '本次 Cas 输入与中间文件目录；隔离验收请指定专用 run 目录' },
     },
     op: 'offtarget_scan',
     timeoutMs: 1_800_000,
@@ -174,6 +178,7 @@ export function registerTools(ctx) {
       '触发词：保存方案、编辑计划、EditPlan、编辑账本、记录方案。',
     parameters: {
       plan_name: { type: 'string', required: true, description: '计划名（只允许 [A-Za-z0-9._-]，如 TP53_demo_KO）' },
+      plan_dir: { type: 'string', description: '计划账本目录；隔离验收可指定专用目录' },
       action: { type: 'string', enum: ['new', 'add_run', 'update_recommendation'], description: '动作，默认 new' },
       intent: { type: 'object', additionalProperties: true, description: 'action=new 时必传：{target, desired_change, modality}' },
       reference: { type: 'object', additionalProperties: true, description: '{organism, assembly, sequence_hash, annotation_version}' },
@@ -181,6 +186,7 @@ export function registerTools(ctx) {
       candidates: { type: 'array', items: { type: 'object', additionalProperties: true }, description: '候选列表（add_run 或 update_recommendation 用）' },
       ranking_policy: { type: 'object', additionalProperties: true, description: '声明式排序策略（objective/weights/tie_breakers/hard_filters）——推荐理由的审计依据' },
       off_target_summary: { type: 'object', additionalProperties: true, description: '脱靶扫描摘要（graft_offtarget 的 search_parameters + per-guide 计数 + interpretation_boundary）' },
+      strategy_result: { type: 'object', additionalProperties: true, description: 'graft_strategy 的完整几何/翻译/组合证据，随本次 run 保留' },
       validation_plan: { type: 'object', additionalProperties: true, description: '验证计划（add_run 用）' },
       risk_flags: { type: 'array', items: { type: 'string' }, description: '风险 flag 列表' },
       provenance: { type: 'object', additionalProperties: true, description: '谁/什么工具/什么参数产生了这些数据（自动审计）' },
@@ -285,6 +291,13 @@ export function registerTools(ctx) {
       region_start_0: { type: 'number', description: '希望删除的区段起点（0-based；deletion_pair 用，用于筛选完整覆盖该区段的组合）' },
       region_end_0: { type: 'number', description: '希望删除的区段终点（0-based 半开）' },
       cds_start_0: { type: 'number', description: 'CDS 起点（0-based）；给了才判断缺失是否移码' },
+      cds_end_0: { type: 'number', description: 'CDS 终点（0-based 半开）；与 cds_start_0 + sequence 一起给才做删除后翻译验证（GF-3）' },
+      cds_strand: { type: 'string', enum: ['+', '-'], description: 'CDS 所在链（默认 +）；一期支持正反链连续完整 CDS' },
+      phase: { type: 'number', description: 'CDS phase；一期仅支持 0，其他值明确不支持' },
+      genetic_code: { type: 'string', enum: ['standard'], description: '遗传密码；一期仅支持 standard' },
+      cds_complete: { type: 'boolean', description: 'CDS 是否完整；false 时不执行翻译，返回 not_supported' },
+      cds_exon_count: { type: 'number', description: 'CDS 外显子数；一期仅支持 1' },
+      sequence: { type: 'string', description: '产生候选的原始输入模板序列（与候选 identity_schema.template_seq_hash 核对）；给完整 CDS 时用于删除后翻译' },
       max_offset_bp: { type: 'number', description: 'paired_nickase 的最大间距（默认 200）' },
       pairwise_window_bp: { type: 'number', description: 'pairwise 脱靶组合的最大间距（默认 10000）' },
       top_n: { type: 'number', description: '返回组合数上限（默认 20）' },

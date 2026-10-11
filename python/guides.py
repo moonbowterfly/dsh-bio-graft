@@ -102,14 +102,38 @@ def cut_site_for(profile, *, pam_start_0: int) -> tuple[int, str, bool]:
 
 def enumerate_guides(sequence: str, editor: str = 'SpCas9',
                      position_base: str = '1', top_n: int = 100,
-                     scan_both_strands: bool = True, record: int = 0) -> dict:
-    """扫描序列枚举 sgRNA 候选（symbolic PAM 匹配，IUPAC 感知，可选双向）。"""
+                     scan_both_strands: bool = True, record: int = 0,
+                     genome_context: dict | None = None,
+                     reference_file: str | None = None) -> dict:
+    """扫描序列枚举 sgRNA 候选（symbolic PAM 匹配，IUPAC 感知，可选双向）。
+
+    genome_context（GF-2 可选）：提供 genomic 模式（assembly/contig/region/strand/输入
+    长度/hash）时，为每条候选补 genomic_* 坐标与 genomic_strand；缺失或 local 保持原
+    坐标含义不变。提供不完整 genomic 字段 → 响亮失败（不假定起点0/正链/默认assembly）。"""
     seq, record_id, n_records = clean_sequence(sequence, record=record)
     profile = get_editor(editor)
     if profile.target_type != 'DNA':
         raise ValueError(
             f'{profile.name} 靶向 {profile.target_type}，v0.1 不提供 designer；'
             f'请用 DNA 靶向编辑器（如 SpCas9/Cas12a）')
+    from guide_contract import (template_seq_hash, validate_genome_context,
+                                map_to_genomic, genomic_strand_of, assign_guide_identity,
+                                verify_reference_region)
+    th = template_seq_hash(seq)
+    gc = validate_genome_context(genome_context)
+    if reference_file is not None and gc["mode"] != "genomic":
+        raise ValueError("reference_file 需要完整 genome_context genomic 定位")
+    if gc["mode"] == "genomic":
+        if gc["input_sequence_length"] != len(seq):
+            raise ValueError("input_sequence_length 与实际读取的输入序列长度冲突")
+        if gc["input_sequence_hash"] != th:
+            raise ValueError("input_sequence_hash 与实际读取的输入序列 hash 冲突")
+        result = verify_reference_region(reference_file, gc, input_sequence=seq)
+        result['method_id'] = 'graft.reference_region_exact'
+        result['method_version'] = 2
+        if result["status"] != "verified" and reference_file is not None:
+            raise ValueError(f"参考核验失败：{result['status']}: {result.get('note')}")
+        gc["reference_verification"] = result
     L = profile.spacer_length
     pam_pat = profile.pam_pattern
     pam_len = len(pam_pat)
@@ -155,7 +179,8 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
 
     # 模板内重复计数（多位点匹配检测）——一个 guide 匹配多处 = 多位点切割，敲除类不可用。
     spacer_counter = Counter(c['protospacer'] for c in candidates)
-    for c in candidates:
+    for idx in range(len(candidates)):
+        c = candidates[idx]
         hits = spacer_counter.get(c['protospacer'], 1)
         c['template_hits'] = hits
         warnings = []
@@ -177,6 +202,17 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
         c['end_1'] = c['end_0']
         if warnings:
             c['warnings'] = warnings
+        # GF-2：genomic 坐标（不改原局部坐标含义，只新增 genomic_* 字段）
+        if gc.get("mode") == "genomic":
+            gm = map_to_genomic(c["start_0"], c["end_0"], c["cut_site_0"], gc)
+            c.update(gm)
+            c["genomic_strand"] = genomic_strand_of(c["strand"],
+                                                    gc["input_strand_relative_to_reference"])
+            c["genome_context"] = gc
+        # F1：核验后的位点内容身份先形成，guide_id 才能包含真实 record hash。
+        c = assign_guide_identity(c, template_hash=th, editor=profile.name,
+                                  pam_pattern=pam_pat)
+        candidates[idx] = c
 
     n_raw = len(candidates)
     n_unique = len(spacer_counter)
@@ -192,6 +228,11 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
                            f'需要其他条请传 record=N' if n_records > 1 else None),
         'position_base': str(position_base),
         'coordinate_system': COORDINATE_SYSTEM,
+        'template_seq_hash': th,
+        'identity_schema': 'graft.guide_identity.v1',
+        'method_id': 'graft.guide_enumeration',
+        'method_version': 2,
+        'genome_context': gc,
         'n_candidates_raw': n_raw,
         'n_returned': len(returned),
         'n_unique_protospacers': n_unique,
@@ -206,24 +247,26 @@ def enumerate_guides(sequence: str, editor: str = 'SpCas9',
 
 
 def score_guides(candidates: list, editor: str = 'SpCas9', **kwargs) -> dict:
-    """给候选打 **on-target 评分向量**（无综合分）。"""
+    """给候选打 **on-target 评分向量**（无综合分）。
+
+    GF-1：深复制输入候选，保留几何/上下文/脱靶/自定义注释与 template_hits/cut_site_0
+    等全部字段；只（重）算自己拥有的 on_target_scores 与评分警告（幂等，不原地改输入）。
+    已给 guide_id 的做一致性核对（篡改/冲突 → 失败）。"""
     profile = get_editor(editor)
+    from guide_contract import assign_guide_identity
     input_candidates = candidates or []
     if not isinstance(input_candidates, list) or not input_candidates:
         raise ValueError('candidates required（来自 guide_enumerate 的输出）')
     scored = []
     for i, c in enumerate(input_candidates):
-        if isinstance(c, dict):
-            spacer = (c.get('protospacer') or '').upper()
-            pam = c.get('pam')
-            start_0 = c.get('start_0')
-            end_0 = c.get('end_0')
-            strand = c.get('strand', '+')
-        else:
-            spacer = str(c).upper()
-            pam = None
-            start_0 = end_0 = None
-            strand = '+'
+        # 深复制：绝不原地改输入；保留全部既有字段
+        import copy as _copy
+        out = _copy.deepcopy(c) if isinstance(c, dict) else {'protospacer': str(c).upper()}
+        spacer = (out.get('protospacer') or '').upper()
+        pam = out.get('pam')
+        start_0 = out.get('start_0')
+        end_0 = out.get('end_0')
+        strand = out.get('strand', '+')
         if not spacer:
             continue
         gc = gc_content(spacer)
@@ -231,35 +274,46 @@ def score_guides(candidates: list, editor: str = 'SpCas9', **kwargs) -> dict:
         pal = _max_self_palindrome(spacer)
         u6 = spacer[0] == 'G'
         seed = spacer[-8:]
-        warnings = []
+        score_warnings = []
         if len(spacer) not in (profile.spacer_length, profile.spacer_length + 1):
-            warnings.append(f'unusual spacer length {len(spacer)} '
-                            f'(expected {profile.spacer_length} for {profile.name})')
+            score_warnings.append(f'unusual spacer length {len(spacer)} '
+                                  f'(expected {profile.spacer_length} for {profile.name})')
         if gc < 0.20 or gc > 0.85:
-            warnings.append('extreme GC (<0.20 or >0.85)')
+            score_warnings.append('extreme GC (<0.20 or >0.85)')
         if runs:
-            warnings.append(f'homopolymer {runs[0]}')
+            score_warnings.append(f'homopolymer {runs[0]}')
         if pal >= 8:
-            warnings.append(f'self-palindrome {pal}nt (secondary structure risk)')
-        scored.append({
-            'idx': i,
-            'protospacer': spacer,
-            'pam': pam,
-            'start_0': start_0,
-            'end_0': end_0,
-            'start_1': (start_0 + 1) if isinstance(start_0, int) else None,
-            'end_1': end_0,
-            'strand': strand,
-            'on_target_scores': {
-                'gc_content': round(gc, 4),
-                'gc_class': 'low' if gc < 0.35 else ('high' if gc > 0.75 else 'mid'),
-                'homopolymer_runs': runs,
-                'max_self_palindrome': pal,
-                'u6_start_pref': bool(u6),
-                'seed_8nt_pam_proximal': seed,
-            },
-            'warnings': warnings,
-        })
+            score_warnings.append(f'self-palindrome {pal}nt (secondary structure risk)')
+        # 幂等合并 warnings：保留既有 warnings，追加评分层新警告（去重）
+        existing_warnings = list(out.get('warnings') or [])
+        merged = existing_warnings + [w for w in score_warnings if w not in existing_warnings]
+        out['idx'] = i
+        out['protospacer'] = spacer
+        out['pam'] = pam
+        out['start_0'] = start_0
+        out['end_0'] = end_0
+        out['start_1'] = (start_0 + 1) if isinstance(start_0, int) else None
+        out['end_1'] = end_0
+        out['strand'] = strand
+        out['on_target_scores'] = {
+            'gc_content': round(gc, 4),
+            'gc_class': 'low' if gc < 0.35 else ('high' if gc > 0.75 else 'mid'),
+            'homopolymer_runs': runs,
+            'max_self_palindrome': pal,
+            'u6_start_pref': bool(u6),
+            'seed_8nt_pam_proximal': seed,
+        }
+        if merged:
+            out['warnings'] = merged
+        # GF-1：身份一致性（已有身份核对，缺身份由内容派生）
+        if (out.get('guide_id') or out.get('identity_schema') or
+                out.get('_template_seq_hash') or out.get('template_seq_hash')):
+            out = assign_guide_identity(out, template_hash=out.get('_template_seq_hash'),
+                                        editor=profile.name,
+                                        pam_pattern=out.get('pam_pattern'))
+        else:
+            out['identity_status'] = 'unresolved'
+        scored.append(out)
     return {
         'editor': profile.name,
         'n_scored': len(scored),

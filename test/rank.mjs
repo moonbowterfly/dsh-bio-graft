@@ -67,11 +67,12 @@ const pareto = op('rank_candidates', {
   hard_filters: { template_hits_max: 1 },
 })
 check('pareto: front contains exactly A (B and D are dominated)',
-  pareto.pareto_front.length === 1 && pareto.pareto_front[0] === A.protospacer,
+  pareto.pareto_front.length === 1 &&
+  pareto.pareto_front[0] === pareto.ranked.find((r) => r.protospacer === A.protospacer)?.record_key,
   JSON.stringify(pareto.pareto_front))
 check('pareto: dominated candidates list who dominates them',
-  pareto.ranked.find((r) => r.protospacer === B.protospacer)?.dominated_by?.includes(A.protospacer) &&
-  pareto.ranked.find((r) => r.protospacer === D.protospacer)?.dominated_by?.includes(A.protospacer),
+  pareto.ranked.find((r) => r.protospacer === B.protospacer)?.dominated_by?.includes(pareto.pareto_front[0]) &&
+  pareto.ranked.find((r) => r.protospacer === D.protospacer)?.dominated_by?.includes(pareto.pareto_front[0]),
   JSON.stringify(pareto.ranked.map((r) => ({ p: r.protospacer[0], d: r.dominated_by?.length }))))
 check('pareto: pareto_rank is 1 for the front, >1 otherwise',
   pareto.ranked.find((r) => r.protospacer === A.protospacer).pareto_rank === 1 &&
@@ -118,7 +119,7 @@ const paretoMissing = op('rank_candidates', {
 check('pareto: candidates missing any objective axis are excluded and cannot dominate',
   paretoMissing.n_ranked === 1 &&
   paretoMissing.pareto_front.length === 1 &&
-  paretoMissing.pareto_front[0] === COMPLETE.protospacer &&
+  paretoMissing.pareto_front[0] === paretoMissing.ranked[0]?.record_key &&
   paretoMissing.excluded.some((e) => e.protospacer === MISSING.protospacer),
   JSON.stringify(paretoMissing))
 
